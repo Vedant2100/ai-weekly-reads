@@ -11,6 +11,13 @@ AI Weekly Reads turns AI videos and podcasts into a weekly reading edition for S
 
 The public GitHub edition is intentionally a rolling pair of files. Each weekly run replaces `weekly/latest.md` and `weekly/latest.epub`.
 
+The key design choice is:
+
+- **Generation:** build Markdown/EPUB/public files from source material
+- **Distribution:** optionally send/publish those files to your own channels
+
+The repository defaults to generation first. Personal delivery is explicit.
+
 ## What Gets Covered
 
 Recurring sources live in [`config/sources.json`](config/sources.json). The weekly run looks back through each source, filters to the configured publication window, skips already-processed items, and summarizes new items.
@@ -49,8 +56,8 @@ flowchart TD
     E --> F["Mistral summaries\nresource notes with speakers, topics, priority"]
     F --> G["Local knowledge base\nknowledge_base/resources + raw_transcripts"]
     G --> H["Weekly digest\nMarkdown + EPUB"]
-    H --> I["Substack post\noutput/substack/latest.md + browser publish"]
-    H --> J["Kindle delivery\nGmail API / SMTP / Apple Mail"]
+    H --> I["Substack export\noutput/substack/latest.md"]
+    H --> J["Optional delivery\nKindle email + Substack browser publish"]
     H --> K["GitHub latest\nweekly/latest.md + weekly/latest.epub"]
     G --> L["Obsidian graph\nresources connected to topic hubs"]
 ```
@@ -69,31 +76,49 @@ The project is local-first. Raw transcripts, resource notes, generated EPUBs, pr
 
 ## Weekly Run
 
-This machine already has a project virtualenv, so the normal weekly command is:
+The default weekly command builds artifacts only:
 
 ```bash
 .venv/bin/python scripts/build_weekly_digest.py
 ```
 
-That command:
+It does all of the following:
 
 1. Fetches recurring sources and inbox links.
 2. Filters recurring sources to the last `publication_window_days` days.
 3. Reuses already-summarized resources.
 4. Transcribes and summarizes new items when needed.
 5. Builds the weekly digest.
-6. Exports the Substack post.
-7. Refreshes `weekly/latest.epub` when an EPUB is available.
-8. Sends the Kindle file if Kindle delivery is enabled.
+6. Writes `weekly/latest.md`.
+7. Writes `weekly/latest.epub` when an EPUB is available.
+8. Writes `output/substack/latest.md`.
 
-Useful manual commands:
+It does **not** email Kindle or publish to Substack by default.
+
+### Build-Only Commands
 
 ```bash
-.venv/bin/python scripts/update_knowledge_base.py
+.venv/bin/python scripts/build_weekly_digest.py
 .venv/bin/python scripts/build_latest_digest.py
-.venv/bin/python scripts/build_latest_digest.py --send
-.venv/bin/python scripts/send_latest_to_kindle.py
 .venv/bin/python scripts/build_substack_post.py --force
+```
+
+### Optional Distribution
+
+Use explicit follow-up commands when you want personal delivery or browser-based publishing:
+
+```bash
+.venv/bin/python scripts/send_latest_to_kindle.py
+.venv/bin/python scripts/send_latest_to_kindle.py --force
+PLAYWRIGHT_BROWSERS_PATH=.venv-substack/ms-playwright .venv-substack/bin/python scripts/create_substack_draft.py
+PLAYWRIGHT_BROWSERS_PATH=.venv-substack/ms-playwright .venv-substack/bin/python scripts/create_substack_draft.py --publish
+```
+
+If you want one command that builds and then sends to Kindle, use:
+
+```bash
+.venv/bin/python scripts/build_weekly_digest.py --send-kindle
+.venv/bin/python scripts/build_latest_digest.py --send-kindle
 ```
 
 Process a one-shot YouTube playlist:
@@ -171,7 +196,10 @@ Successful sends are recorded in `output/_metadata/kindle_delivery.json` so the 
 
 ### Substack
 
-Substack output is generated as Markdown first, then optionally published through a dedicated Playwright browser profile.
+Substack support has two separate steps:
+
+1. Generate a Substack-ready Markdown post at `output/substack/latest.md`
+2. Optionally publish it through a dedicated Playwright browser profile
 
 Local setup:
 

@@ -16,7 +16,7 @@ def main() -> None:
     settings = load_settings()
     kindle_file = _latest_kindle_file()
     if not kindle_file:
-        print("No Kindle digest found under output/. Run scripts/build_weekly_digest.py first.")
+        print("No Kindle digest found under output/. Run scripts/build_weekly_digest.py or scripts/build_latest_digest.py first.")
         sys.exit(1)
     print(maybe_send_to_kindle(kindle_file, settings, force=args.force))
 

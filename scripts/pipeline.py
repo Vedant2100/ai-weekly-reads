@@ -36,6 +36,14 @@ class RunStats:
     skipped_outside_window: int = 0
 
 
+@dataclass(frozen=True)
+class BuildArtifacts:
+    digest_path: Path
+    kindle_path: Path
+    substack_path: Path | None
+    weekly_resource_count: int
+
+
 def update_knowledge_base(settings: Settings) -> RunStats:
     publication_cutoff = publication_cutoff_for(settings)
     stats = RunStats()
@@ -147,7 +155,7 @@ def discover_items(settings: Settings, publication_cutoff: date | None, stats: R
     return items
 
 
-def build_weekly_book(settings: Settings) -> tuple[Path, Path, int] | None:
+def build_weekly_artifacts(settings: Settings) -> BuildArtifacts | None:
     publication_cutoff = publication_cutoff_for(settings)
     weekly_resources = list_resources(settings.weekly_resource_limit, since=publication_cutoff)
     if not weekly_resources:
@@ -165,12 +173,25 @@ def build_weekly_book(settings: Settings) -> tuple[Path, Path, int] | None:
         print(publish_public_epub(kindle_path))
     except Exception as exc:
         print(f"Public EPUB publish failed: {exc}")
-    print(substack_status(build_substack_post(digest_path, settings)))
-    return digest_path, kindle_path, len(weekly_resources)
+    substack_path = build_substack_post(digest_path, settings)
+    print(substack_status(substack_path))
+    return BuildArtifacts(
+        digest_path=digest_path,
+        kindle_path=kindle_path,
+        substack_path=substack_path,
+        weekly_resource_count=len(weekly_resources),
+    )
 
 
-def deliver_to_kindle(kindle_path: Path, settings: Settings) -> str:
-    return maybe_send_to_kindle(kindle_path, settings)
+def build_weekly_book(settings: Settings) -> tuple[Path, Path, int] | None:
+    artifacts = build_weekly_artifacts(settings)
+    if not artifacts:
+        return None
+    return artifacts.digest_path, artifacts.kindle_path, artifacts.weekly_resource_count
+
+
+def deliver_to_kindle(kindle_path: Path, settings: Settings, *, force: bool = False) -> str:
+    return maybe_send_to_kindle(kindle_path, settings, force=force)
 
 
 def publication_cutoff_for(settings: Settings) -> date | None:

@@ -63,11 +63,14 @@ Each run checks the configured source inspection windows, filters recurring sour
 
 ## Commands
 
+Default build commands generate artifacts only. Distribution is a separate explicit step.
+
 ```bash
 .venv/bin/python scripts/update_knowledge_base.py
 .venv/bin/python scripts/build_latest_digest.py
-.venv/bin/python scripts/build_latest_digest.py --send
 .venv/bin/python scripts/build_weekly_digest.py
+.venv/bin/python scripts/build_latest_digest.py --send-kindle
+.venv/bin/python scripts/build_weekly_digest.py --send-kindle
 .venv/bin/python scripts/setup_gmail_oauth.py
 .venv/bin/python scripts/send_latest_to_kindle.py
 .venv/bin/python scripts/send_latest_to_kindle.py --force

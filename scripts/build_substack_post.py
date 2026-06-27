@@ -23,7 +23,7 @@ def main() -> None:
     settings = load_settings()
     digest_path = Path(args.digest) if args.digest else _latest_digest()
     if not digest_path:
-        print("No generated digest found under output/. Run scripts/build_weekly_digest.py first.")
+        print("No generated digest found under output/. Run scripts/build_weekly_digest.py or scripts/build_latest_digest.py first.")
         return
 
     print(substack_status(build_substack_post(digest_path, settings, force=args.force)))
