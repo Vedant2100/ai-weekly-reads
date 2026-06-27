@@ -7,7 +7,7 @@ AI Weekly Reads turns AI videos and podcasts into a weekly reading edition for S
 - **Substack:** [AI Weekly Reads](https://aiweeklyreads.substack.com/)
 - **Latest GitHub edition:** [`weekly/latest.md`](weekly/latest.md)
 - **Latest EPUB:** [`weekly/latest.epub`](weekly/latest.epub)
-- **Kindle:** generated locally as EPUB/Markdown under `output/` and sent by the local delivery script
+- **Kindle:** public EPUB at [`weekly/latest.epub`](weekly/latest.epub), with optional private send-to-Kindle delivery
 
 The public GitHub edition is intentionally a rolling pair of files. Each weekly run replaces `weekly/latest.md` and `weekly/latest.epub`.
 
