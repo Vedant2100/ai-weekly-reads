@@ -5,29 +5,36 @@ import subprocess
 from pathlib import Path
 from urllib.parse import urlparse
 
-from project_paths import PUBLIC_WEEKLY, ROOT
+from project_paths import PUBLIC_LATEST_EPUB, PUBLIC_WEEKLY, ROOT
 
 
 PUBLIC_EPUB_PATH = PUBLIC_WEEKLY / "latest.epub"
 
 
-def public_epub_repo_url() -> str:
+def public_repo_url(relative_path: str) -> str:
     remote_url = _git_remote_url("origin")
     owner_repo = _github_owner_repo(remote_url)
     if not owner_repo:
         return ""
-    return f"https://raw.githubusercontent.com/{owner_repo}/main/weekly/latest.epub"
+    return f"https://raw.githubusercontent.com/{owner_repo}/main/{relative_path.lstrip('/')}"
+
+
+def public_epub_repo_url(relative_path: str = "weekly/latest.epub") -> str:
+    return public_repo_url(relative_path)
 
 
 def public_epub_markdown_url() -> str:
     return "latest.epub"
 
 
-def publish_public_epub(epub_path: Path) -> str:
+def publish_public_epub(epub_path: Path, public_epub_path: Path = PUBLIC_EPUB_PATH, *, update_root_latest: bool = True) -> str:
     if epub_path.suffix.lower() != ".epub" or not epub_path.exists():
         return "Public EPUB skipped: latest Kindle output is not an EPUB."
-    shutil.copy2(epub_path, PUBLIC_EPUB_PATH)
-    return f"Public EPUB written: {PUBLIC_EPUB_PATH}"
+    public_epub_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(epub_path, public_epub_path)
+    if update_root_latest:
+        shutil.copy2(epub_path, PUBLIC_LATEST_EPUB)
+    return f"Public EPUB written: {public_epub_path}"
 
 
 def _git_remote_url(remote_name: str) -> str:

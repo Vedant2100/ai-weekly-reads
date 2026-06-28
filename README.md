@@ -5,11 +5,19 @@ AI Weekly Reads turns AI videos and podcasts into a weekly reading edition for S
 ## Read It
 
 - **Substack:** [AI Weekly Reads](https://aiweeklyreads.substack.com/)
-- **Latest GitHub edition:** [`weekly/latest.md`](weekly/latest.md)
-- **Latest EPUB:** [`weekly/latest.epub`](weekly/latest.epub)
-- **Kindle:** public EPUB at [`weekly/latest.epub`](weekly/latest.epub), with optional private send-to-Kindle delivery
+- **Latest GitHub edition:** [`latest.md`](latest.md)
+- **Latest EPUB:** [`latest.epub`](latest.epub)
+- **Latest weekly GitHub edition:** [`weekly/latest.md`](weekly/latest.md)
+- **Latest weekly EPUB:** [`weekly/latest.epub`](weekly/latest.epub)
+- **Latest one-shot GitHub edition:** [`one-shot/latest.md`](one-shot/latest.md)
+- **Latest one-shot EPUB:** [`one-shot/latest.epub`](one-shot/latest.epub)
+- **Kindle:** public EPUBs at [`latest.epub`](latest.epub), [`weekly/latest.epub`](weekly/latest.epub), and [`one-shot/latest.epub`](one-shot/latest.epub) when available, with optional private send-to-Kindle delivery
 
-The public GitHub edition is intentionally a rolling pair of files. Each weekly run replaces `weekly/latest.md` and `weekly/latest.epub`.
+The public GitHub edition is intentionally rolling:
+
+- Every public build refreshes the top-level `latest.md` and `latest.epub`.
+- Weekly runs replace `weekly/latest.md` and `weekly/latest.epub`.
+- One-shot playlist runs replace `one-shot/latest.md` and `one-shot/latest.epub`.
 
 The key design choice is:
 
@@ -59,11 +67,11 @@ flowchart TD
     G --> H["Weekly digest\nMarkdown + EPUB"]
     H --> I["Substack export\noutput/substack/latest.md"]
     H --> J["Optional delivery\nKindle email + Substack browser publish"]
-    H --> K["GitHub latest\nweekly/latest.md + weekly/latest.epub"]
+    H --> K["GitHub latest\nlatest.* plus weekly/latest.* or one-shot/latest.*"]
     G --> L["Obsidian graph\nresources connected to topic hubs"]
 ```
 
-The project is local-first. Raw transcripts, resource notes, generated EPUBs, private settings, browser sessions, and delivery ledgers are ignored by Git. The repository stores the workflow, prompts, source registry, and the single current public edition.
+The project is local-first. Raw transcripts, resource notes, generated EPUBs, private settings, browser sessions, and delivery ledgers are ignored by Git. The repository stores the workflow, prompts, source registry, and the current rolling public editions.
 
 ## How YouTube And Podcasts Are Processed
 
@@ -87,12 +95,16 @@ After discovery, every item goes through the same shared pipeline: stable ID, pu
 5. If no publisher transcript is present and Mistral transcription is enabled, it tries the remote audio URL directly, then falls back to downloading the media file and transcribing that file.
 6. The transcript is stored locally, summarized, and written into the weekly outputs.
 
-The summary and output stage is identical after that point. Both source types end up as local resource notes in `knowledge_base/resources/`, raw transcript notes in `knowledge_base/raw_transcripts/`, a public Markdown digest in `weekly/latest.md`, a public EPUB in `weekly/latest.epub`, and a Substack-ready export in `output/substack/latest.md`.
+The summary and output stage is identical after that point. Both source types end up as local resource notes in `knowledge_base/resources/`, raw transcript notes in `knowledge_base/raw_transcripts/`, a top-level public Markdown/EPUB pair in `latest.md` and `latest.epub`, a category-specific public Markdown digest in `weekly/latest.md` for weekly runs or `one-shot/latest.md` for playlist runs, a matching category-specific EPUB when available, and a Substack-ready export in `output/substack/latest.md`.
 
 ## Outputs
 
-- `weekly/latest.md`: current summaries-only public edition tracked in Git
-- `weekly/latest.epub`: current public Kindle-friendly EPUB tracked in Git
+- `latest.md`: most recently refreshed public edition tracked in Git, regardless of weekly vs one-shot
+- `latest.epub`: EPUB companion for the most recently refreshed public edition when available
+- `weekly/latest.md`: current summaries-only weekly public edition tracked in Git
+- `weekly/latest.epub`: current weekly public Kindle-friendly EPUB tracked in Git
+- `one-shot/latest.md`: current public one-shot playlist edition tracked in Git
+- `one-shot/latest.epub`: current public one-shot playlist EPUB tracked in Git when available
 - `output/kindle-digest-YYYY-MM-DD.md`: local weekly Markdown book
 - `output/kindle-digest-YYYY-MM-DD.epub`: Kindle-friendly EPUB when `pandoc` is installed
 - `output/substack/latest.md`: current Substack-ready post
@@ -114,8 +126,8 @@ It does all of the following:
 3. Reuses already-summarized resources.
 4. Transcribes and summarizes new items when needed.
 5. Builds the weekly digest.
-6. Writes `weekly/latest.md`.
-7. Writes `weekly/latest.epub` when an EPUB is available.
+6. Writes `latest.md` and `weekly/latest.md`.
+7. Writes `latest.epub` and `weekly/latest.epub` when an EPUB is available.
 8. Writes `output/substack/latest.md`.
 
 It does **not** email Kindle or publish to Substack by default.
@@ -151,6 +163,8 @@ Process a one-shot YouTube playlist:
 ```bash
 .venv/bin/python scripts/build_playlist_digest.py "https://www.youtube.com/playlist?list=PLAYLIST_ID" --send-kindle --substack
 ```
+
+That command also refreshes the rolling public one-shot artifacts at `one-shot/latest.md` and `one-shot/latest.epub`, and it updates the top-level `latest.md` and `latest.epub` pointers to that one-shot edition.
 
 Publish the latest Substack post with the saved browser profile:
 

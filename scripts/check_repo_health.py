@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any
 
 from config import Settings, load_settings
-from project_paths import ASSETS, CONFIG, PROMPTS, PUBLIC_WEEKLY, ROOT
+from project_paths import ASSETS, CONFIG, PROMPTS, PUBLIC_LATEST_EPUB, PUBLIC_LATEST_MD, PUBLIC_ONE_SHOT, PUBLIC_WEEKLY, ROOT
 from source_registry import load_source_registry, source_lookback_count
 from utils import is_url
 
@@ -186,15 +187,62 @@ def _check_git_hygiene(errors: list[str]) -> None:
         suffix = " ..." if len(tracked) > 10 else ""
         errors.append(f"Generated/private paths are tracked by Git: {joined}{suffix}")
 
-    public_weekly_files = sorted(
+    _check_public_dir(PUBLIC_WEEKLY, "weekly", errors, allow_empty=False)
+    _check_public_dir(PUBLIC_ONE_SHOT, "one-shot", errors, allow_empty=True)
+    _check_root_public_latest(errors)
+
+
+def _check_public_dir(public_dir: Path, label: str, errors: list[str], *, allow_empty: bool) -> None:
+    public_files = sorted(
         path.relative_to(ROOT).as_posix()
-        for path in PUBLIC_WEEKLY.glob("*")
+        for path in public_dir.glob("*")
         if path.is_file()
     )
-    if public_weekly_files not in (["weekly/latest.md"], ["weekly/latest.epub", "weekly/latest.md"]):
-        errors.append("weekly/ should contain only public latest artifacts: weekly/latest.md and optional weekly/latest.epub.")
-    elif "# Appendix: Full Transcripts" in (PUBLIC_WEEKLY / "latest.md").read_text(encoding="utf-8"):
-        errors.append("weekly/latest.md must not contain full transcripts.")
+    expected_md = f"{label}/latest.md"
+    expected_epub = f"{label}/latest.epub"
+    allowed = [expected_md]
+    allowed_with_epub = [expected_epub, expected_md]
+    if allow_empty and not public_files:
+        return
+    if public_files not in (allowed, allowed_with_epub):
+        errors.append(f"{label}/ should contain only public latest artifacts: {expected_md} and optional {expected_epub}.")
+        return
+    latest_md = public_dir / "latest.md"
+    if latest_md.exists():
+        _check_public_markdown(latest_md, label, errors)
+
+
+def _check_public_markdown(path: Path, label: str, errors: list[str]) -> None:
+    text = path.read_text(encoding="utf-8")
+    if "# Appendix: Full Transcripts" in text:
+        errors.append(f"{label}/latest.md must not contain full transcripts.")
+    for marker in ("## Contents", "## Reading Notes"):
+        if marker not in text:
+            errors.append(f"{label}/latest.md is missing {marker!r}.")
+    if not re.search(r"^- \*\*(Published|Added):\*\*", text, re.MULTILINE):
+        errors.append(f"{label}/latest.md should include published or added dates in each summary.")
+    if not re.search(r"^- \*\*(YouTube|Podcast|Video|Livestream|Source):\*\* \[[^\]]+\]\(https?://", text, re.MULTILINE):
+        errors.append(f"{label}/latest.md should include linked source labels for original items.")
+
+
+def _check_root_public_latest(errors: list[str]) -> None:
+    if not PUBLIC_LATEST_MD.exists():
+        errors.append("latest.md should exist at the repository root and track the most recent public edition.")
+    else:
+        _check_root_public_markdown(PUBLIC_LATEST_MD, errors)
+
+
+def _check_root_public_markdown(path: Path, errors: list[str]) -> None:
+    text = path.read_text(encoding="utf-8")
+    if "# Appendix: Full Transcripts" in text:
+        errors.append("latest.md must not contain full transcripts.")
+    for marker in ("## Contents", "## Reading Notes"):
+        if marker not in text:
+            errors.append(f"latest.md is missing {marker!r}.")
+    if not re.search(r"^- \*\*(Published|Added):\*\*", text, re.MULTILINE):
+        errors.append("latest.md should include published or added dates in each summary.")
+    if not re.search(r"^- \*\*(YouTube|Podcast|Video|Livestream|Source):\*\* \[[^\]]+\]\(https?://", text, re.MULTILINE):
+        errors.append("latest.md should include linked source labels for original items.")
 
 
 def _check_list(registry: dict[str, Any], key: str, errors: list[str]) -> None:

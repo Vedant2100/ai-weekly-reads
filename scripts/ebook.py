@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 from config import Settings
@@ -28,21 +29,53 @@ def _build_epub(markdown_path: Path) -> Path:
         return markdown_path
 
     epub_path = OUTPUT / f"{markdown_path.stem}.epub"
-    subprocess.run(
-        [
-            pandoc,
-            str(markdown_path),
-            "--from",
-            "markdown+yaml_metadata_block",
-            "--to",
-            "epub3",
-            "--css",
-            str(KINDLE_CSS),
-            "--toc",
-            "--toc-depth=2",
-            "--output",
-            str(epub_path),
-        ],
-        check=True,
-    )
+    epub_source = _prepare_epub_source(markdown_path)
+    try:
+        subprocess.run(
+            [
+                pandoc,
+                str(epub_source),
+                "--from",
+                "markdown+yaml_metadata_block",
+                "--to",
+                "epub3",
+                "--css",
+                str(KINDLE_CSS),
+                "--toc",
+                "--toc-depth=1",
+                "--output",
+                str(epub_path),
+            ],
+            check=True,
+        )
+    finally:
+        if epub_source != markdown_path:
+            epub_source.unlink(missing_ok=True)
     return epub_path
+
+
+def _prepare_epub_source(markdown_path: Path) -> Path:
+    text = markdown_path.read_text(encoding="utf-8")
+    lines = text.splitlines()
+    frontmatter_end = _frontmatter_end(lines)
+    preface_end = next((index for index, line in enumerate(lines[frontmatter_end:], start=frontmatter_end) if line.strip() == "## Reading Notes"), None)
+    if preface_end is not None:
+        kept_lines = lines[:frontmatter_end]
+        kept_lines.extend(["", *lines[preface_end + 1 :]])
+        transformed = "\n".join(kept_lines).strip() + "\n"
+    else:
+        transformed = text
+    if transformed == text:
+        return markdown_path
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".md", delete=False, dir=OUTPUT) as handle:
+        handle.write(transformed)
+        return Path(handle.name)
+
+
+def _frontmatter_end(lines: list[str]) -> int:
+    if not lines or lines[0].strip() != "---":
+        return 0
+    for index in range(1, len(lines)):
+        if lines[index].strip() == "---":
+            return index + 1
+    return 0

@@ -11,6 +11,9 @@ CONFIG = ROOT / "config"
 OUTPUT = ROOT / "output"
 SUBSTACK_OUTPUT = OUTPUT / "substack"
 PUBLIC_WEEKLY = ROOT / "weekly"
+PUBLIC_ONE_SHOT = ROOT / "one-shot"
+PUBLIC_LATEST_MD = ROOT / "latest.md"
+PUBLIC_LATEST_EPUB = ROOT / "latest.epub"
 PROMPTS = ROOT / "prompts"
 KNOWLEDGE_BASE = ROOT / "knowledge_base"
 OBSIDIAN_CONFIG = KNOWLEDGE_BASE / ".obsidian"
@@ -36,6 +39,7 @@ def ensure_dirs() -> None:
         OUTPUT,
         SUBSTACK_OUTPUT,
         PUBLIC_WEEKLY,
+        PUBLIC_ONE_SHOT,
         KNOWLEDGE_BASE,
         ROOT_OBSIDIAN_CONFIG,
         OBSIDIAN_CONFIG,

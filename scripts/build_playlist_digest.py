@@ -9,7 +9,8 @@ from typing import Any
 from config import load_settings
 from digest import build_digest
 from ebook import build_kindle_file
-from project_paths import ROOT, ensure_dirs
+from public_epub import publish_public_epub
+from project_paths import PUBLIC_ONE_SHOT, ROOT, ensure_dirs
 from resources import find_resource, is_summarized_resource, write_resource
 from send_to_kindle import maybe_send_to_kindle
 from sources import MediaItem, resolve_link
@@ -22,7 +23,7 @@ from utils import load_dotenv, read_text, slugify, ytdlp_js_runtimes
 def main() -> None:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(line_buffering=True)
-    parser = argparse.ArgumentParser(description="Build a one-shot Kindle/Substack digest from a YouTube playlist.")
+    parser = argparse.ArgumentParser(description="Build a one-shot Kindle/Substack/public digest from a YouTube playlist.")
     parser.add_argument("playlist_url", help="YouTube playlist URL")
     parser.add_argument("--title", help="Digest title. Defaults to the YouTube playlist title.")
     parser.add_argument("--limit", type=int, default=100, help="Maximum playlist videos to inspect.")
@@ -49,13 +50,18 @@ def main() -> None:
         resource_paths,
         playlist_settings,
         output_prefix=output_prefix,
-        write_public_latest=False,
+        public_output_dir=PUBLIC_ONE_SHOT,
         write_weekly_book=False,
+        include_title_date=False,
+        include_period_label=False,
     )
     kindle_path = build_kindle_file(digest_path, settings)
     print(f"Playlist digest written: {digest_path}")
     if kindle_path != digest_path:
         print(f"Playlist Kindle file written: {kindle_path}")
+    public_digest_path = PUBLIC_ONE_SHOT / "latest.md"
+    print(f"Public one-shot digest written: {public_digest_path}")
+    print(publish_public_epub(kindle_path, PUBLIC_ONE_SHOT / "latest.epub"))
 
     if args.send_kindle:
         print(maybe_send_to_kindle(kindle_path, settings, force=args.force_kindle))

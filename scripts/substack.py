@@ -32,7 +32,7 @@ def build_substack_post(digest_path: Path, settings: Settings, *, force: bool = 
     intro = str(substack.get("intro") or (PLAYLIST_INTRO if is_playlist else DEFAULT_INTRO)).strip()
 
     body = _prepare_body(body, title, intro, is_playlist=is_playlist)
-    body = _replace_public_epub_link(body, public_epub_repo_url())
+    body = _replace_public_epub_link(body, public_epub_repo_url(_public_epub_relative_path(is_playlist)))
     output_path = _output_path(title, created)
     write_text(output_path, body)
 
@@ -67,6 +67,12 @@ def _replace_public_epub_link(markdown: str, absolute_url: str) -> str:
     if not absolute_url:
         return markdown
     return markdown.replace(f"]({public_epub_markdown_url()})", f"]({absolute_url})")
+
+
+def _public_epub_relative_path(is_playlist: bool) -> str:
+    if is_playlist:
+        return "one-shot/latest.epub"
+    return "weekly/latest.epub"
 
 
 def _strip_graph_only_sections(markdown: str) -> str:

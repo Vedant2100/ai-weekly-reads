@@ -6,7 +6,7 @@ from config import Settings
 from obsidian_metadata import obsidian_aliases, yaml_list_block
 from obsidian_graph import weekly_resource_links
 from public_epub import public_epub_markdown_url
-from project_paths import OUTPUT, PUBLIC_WEEKLY, WEEKLY_BOOKS
+from project_paths import OUTPUT, PUBLIC_LATEST_MD, PUBLIC_WEEKLY, WEEKLY_BOOKS
 from summary_metadata import featured_speakers, without_featured_speakers
 from utils import parse_date, read_text, split_frontmatter, today_stamp, write_text, yaml_value
 
@@ -17,12 +17,15 @@ def build_digest(
     *,
     output_prefix: str = "kindle-digest",
     write_public_latest: bool = True,
+    public_output_dir: Path = PUBLIC_WEEKLY,
     write_weekly_book: bool = True,
+    include_title_date: bool = True,
+    include_period_label: bool = True,
 ) -> Path:
     stamp = today_stamp()
     output_path = OUTPUT / f"{output_prefix}-{stamp}.md"
     weekly_book_path = WEEKLY_BOOKS / output_path.name
-    title = f"{settings.digest_title} - {stamp}"
+    title = f"{settings.digest_title} - {stamp}" if include_title_date else settings.digest_title
     lines: list[str] = [
         "---",
         f"title: {yaml_value(title)}",
@@ -35,9 +38,9 @@ def build_digest(
         "",
         f"# {settings.digest_title}",
         "",
-        f"Week of {stamp}",
-        "",
     ]
+    if include_period_label:
+        lines.extend([f"Week of {stamp}", ""])
     lines.extend([f"[Download the latest EPUB for Kindle]({public_epub_markdown_url()})", ""])
     lines.extend(["## Contents", ""])
     for index, resource_path in enumerate(resource_paths, start=1):
@@ -71,7 +74,8 @@ def build_digest(
     if write_weekly_book:
         write_text(weekly_book_path, local_content)
     if write_public_latest:
-        write_text(PUBLIC_WEEKLY / "latest.md", public_content)
+        write_text(public_output_dir / "latest.md", public_content)
+        write_text(PUBLIC_LATEST_MD, public_content)
     return output_path
 
 
