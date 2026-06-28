@@ -31,6 +31,7 @@ Sources are grouped by editorial type, then fetched through the most reliable up
 - [Stripe](https://www.youtube.com/@stripe/videos)
 - [Vanishing Gradients livestreams](https://www.youtube.com/@vanishinggradients/streams)
 - [Claude livestreams](https://www.youtube.com/@claude/streams)
+- [Stanford Online](https://www.youtube.com/@stanfordonline/)
 
 ### Podcasts And Podcast-Style Sources
 

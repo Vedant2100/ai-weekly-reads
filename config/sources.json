@@ -24,6 +24,11 @@
       "name": "Claude",
       "url": "https://www.youtube.com/@claude/streams",
       "lookback_count": 50
+    },
+    {
+      "name": "Stanford Online",
+      "url": "https://www.youtube.com/@stanfordonline/",
+      "lookback_count": 50
     }
   ],
   "podcasts": [
