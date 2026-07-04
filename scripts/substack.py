@@ -7,7 +7,7 @@ from typing import Any
 from config import Settings
 from public_epub import public_epub_markdown_url, public_epub_repo_url
 from project_paths import SUBSTACK_OUTPUT
-from utils import read_text, slugify, split_frontmatter, write_text
+from utils import read_text, slugify, split_frontmatter, strip_graph_only_sections, write_text
 
 
 DEFAULT_INTRO = (
@@ -42,7 +42,7 @@ def build_substack_post(digest_path: Path, settings: Settings, *, force: bool = 
 
 
 def _prepare_body(markdown: str, title: str, intro: str, *, is_playlist: bool) -> str:
-    body = _strip_graph_only_sections(markdown.strip())
+    body = strip_graph_only_sections(markdown.strip())
     body = _strip_obsidian_links(body)
     body = _remove_obsidian_lines(body)
     body = _remove_duplicate_item_headings(body)
@@ -64,38 +64,18 @@ def _prepare_body(markdown: str, title: str, intro: str, *, is_playlist: bool) -
 
 
 def _replace_public_epub_link(markdown: str, absolute_url: str) -> str:
-    if not absolute_url:
-        return markdown
-    return markdown.replace(f"]({public_epub_markdown_url()})", f"]({absolute_url})")
+    relative_target = f"]({public_epub_markdown_url()})"
+    if absolute_url:
+        return markdown.replace(relative_target, f"]({absolute_url})")
+    # Without an absolute URL the relative link would be dead on Substack;
+    # drop the download line entirely.
+    return "\n".join(line for line in markdown.splitlines() if relative_target not in line)
 
 
 def _public_epub_relative_path(is_playlist: bool) -> str:
     if is_playlist:
         return "one-shot/latest.epub"
     return "weekly/latest.epub"
-
-
-def _strip_graph_only_sections(markdown: str) -> str:
-    lines = markdown.splitlines()
-    kept: list[str] = []
-    skipping_level: int | None = None
-    for line in lines:
-        heading = re.match(r"^(#{1,6})\s+(.+?)\s*$", line)
-        if heading:
-            level = len(heading.group(1))
-            label = heading.group(2).strip().lower()
-            if label in {"connections", "related notes", "obsidian connections"}:
-                skipping_level = level
-                continue
-            if skipping_level is not None and level <= skipping_level:
-                skipping_level = None
-        if skipping_level is not None:
-            if line.strip() == "***":
-                skipping_level = None
-                kept.append(line)
-            continue
-        kept.append(line)
-    return "\n".join(kept)
 
 
 def _strip_obsidian_links(markdown: str) -> str:
@@ -189,7 +169,14 @@ def _normalized_heading(value: str) -> str:
 
 def _is_duplicate_subheading(current_title: str, subheading: str) -> bool:
     normalized = _normalized_heading(subheading)
-    return bool(normalized) and (normalized == current_title or normalized in current_title)
+    if not normalized:
+        return False
+    if normalized == current_title:
+        return True
+    # Treat only long fragments as repeats of the item title, so a short
+    # section heading like "Main Ideas" is never stripped just because the
+    # item title happens to contain those words.
+    return len(normalized) >= 25 and normalized in current_title
 
 
 def _next_nonblank(lines: list[str], index: int) -> str:

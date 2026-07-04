@@ -41,6 +41,7 @@ Each run checks the configured source inspection windows, filters recurring sour
 - `max_items_per_run` in `config/settings.json` is an optional safety cap; `0` means unlimited.
 - `weekly_resource_limit` controls how many recent resource notes are included in the weekly book.
 - YouTube channels use `yt-dlp --flat-playlist` to collect recent video URLs. Preserve explicit channel tabs such as `/streams`; they intentionally restrict discovery to that content type.
+- Channel items whose publication date cannot be resolved are treated as outside the weekly window and skipped, so a transient yt-dlp metadata failure cannot flood a run with the full lookback backlog. Podcast RSS items with missing dates are still included.
 - Podcasts use RSS feeds and stable IDs derived from GUID/link/audio URL.
 - `source_type` describes how an item was fetched/transcribed; optional `content_type` describes how the digest should label it, such as YouTube-hosted podcasts.
 - `follow_builders` settings can adapt a compatible JSON feed for podcast transcript ingestion.
@@ -65,6 +66,7 @@ Each run checks the configured source inspection windows, filters recurring sour
 - Apple Mail remains available with `KINDLE_DELIVERY_METHOD=apple_mail`, but only when the macOS Mail app has a configured sending account.
 - If Mail has no configured accounts, delivery is skipped and should not be recorded as sent.
 - Successful sends are recorded in `output/_metadata/kindle_delivery.json`; do not resend the same digest unless the user asks for `--force`.
+- Setting `send_to_kindle: false` on a resource note excludes it from the generated weekly book entirely — the digest, public editions, EPUB, and Substack export all build from the same book. Excluded notes are logged during the build.
 
 ## Commands
 

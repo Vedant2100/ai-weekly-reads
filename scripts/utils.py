@@ -39,9 +39,27 @@ def read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def write_text(path: Path, value: str) -> None:
+def write_text(path: Path, value: str, mode: int | None = None) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(value, encoding="utf-8")
+    # Write via a temp file so a crash mid-write can't leave a truncated
+    # resource or transcript that later parses as frontmatter-less.
+    tmp_path = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        tmp_path.write_text(value, encoding="utf-8")
+        if mode is not None:
+            os.chmod(tmp_path, mode)
+        os.replace(tmp_path, path)
+    except BaseException:
+        tmp_path.unlink(missing_ok=True)
+        raise
+
+
+def as_bool(value: object, default: bool = True) -> bool:
+    if value is None or value == "":
+        return default
+    if isinstance(value, str):
+        return value.strip().lower() not in {"false", "0", "no", "off"}
+    return bool(value)
 
 
 def yaml_value(value: Any) -> str:
@@ -96,10 +114,36 @@ def _parse_yaml_scalar(value: str) -> Any:
     return value
 
 
+GRAPH_ONLY_HEADINGS = {"connections", "related notes", "obsidian connections"}
+
+
+def strip_graph_only_sections(markdown: str) -> str:
+    lines = markdown.splitlines()
+    kept: list[str] = []
+    skipping_level: int | None = None
+    for line in lines:
+        heading = re.match(r"^(#{1,6})\s+(.+?)\s*$", line)
+        if heading:
+            level = len(heading.group(1))
+            label = heading.group(2).strip().lower()
+            if label in GRAPH_ONLY_HEADINGS:
+                skipping_level = level
+                continue
+            if skipping_level is not None and level <= skipping_level:
+                skipping_level = None
+        if skipping_level is not None:
+            if line.strip() == "***":
+                skipping_level = None
+                kept.append(line)
+            continue
+        kept.append(line)
+    return "\n".join(kept)
+
+
 def load_dotenv(path: Path) -> None:
     if not path.exists():
         return
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for line in path.read_text(encoding="utf-8-sig").splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
@@ -142,10 +186,10 @@ def is_url(value: str) -> bool:
 
 def youtube_video_id(url: str) -> str | None:
     parsed = urlparse(url)
-    host = parsed.netloc.lower()
-    if host.endswith("youtu.be"):
+    host = parsed.netloc.lower().rsplit("@", 1)[-1].split(":", 1)[0]
+    if host == "youtu.be":
         return parsed.path.strip("/") or None
-    if "youtube.com" in host:
+    if host == "youtube.com" or host.endswith(".youtube.com"):
         query_id = parse_qs(parsed.query).get("v", [None])[0]
         if query_id:
             return query_id

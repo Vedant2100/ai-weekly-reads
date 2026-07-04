@@ -93,8 +93,20 @@ def _batch_request(batch_item: SummaryBatchItem, settings: Settings) -> dict:
 
 def _wait_for_batch(client, job_id: str, poll_seconds: int, timeout_seconds: int):
     deadline = time.monotonic() + timeout_seconds
+    poll_failures = 0
     while True:
-        job = client.batch.jobs.get(job_id=job_id)
+        try:
+            job = client.batch.jobs.get(job_id=job_id)
+        except Exception as exc:
+            # A transient network error must not abandon a batch job that is
+            # still running (and billing) server-side.
+            poll_failures += 1
+            if poll_failures >= 3 or time.monotonic() >= deadline:
+                raise
+            print(f"Mistral batch poll failed ({exc}); retrying in {poll_seconds}s")
+            time.sleep(poll_seconds)
+            continue
+        poll_failures = 0
         status = str(_get_attr(job, "status", "")).upper()
         print(f"Mistral batch job {job_id}: {status}")
         if status in {"SUCCESS", "SUCCEEDED", "COMPLETED", "FAILED", "CANCELLED", "CANCELED", "TIMEOUT_EXCEEDED"}:
@@ -121,8 +133,8 @@ def _parse_jsonl_response(response) -> list[dict]:
 
 
 def _extract_content(row: dict) -> str:
-    body = row.get("response", {}).get("body") or row.get("body") or row
-    choices = body.get("choices", [])
+    body = (row.get("response") or {}).get("body") or row.get("body") or row
+    choices = body.get("choices") or []
     if not choices:
         return ""
     message = choices[0].get("message", {})

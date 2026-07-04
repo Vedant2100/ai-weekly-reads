@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import tempfile
 from pathlib import Path
 
@@ -13,43 +14,59 @@ from transcription.youtube import download_youtube_audio, fetch_youtube_captions
 
 def get_or_create_transcript(item: MediaItem, settings: Settings) -> tuple[Path | None, str]:
     transcript_path = find_raw_transcript(item.id)
-    publisher_transcript = _publisher_transcript(item)
     if transcript_path and transcript_path.exists():
         cached_text = read_transcript_text(transcript_path)
-        if cached_text.lower().startswith("transcript unavailable"):
-            if publisher_transcript:
-                write_raw_transcript(item, publisher_transcript, transcript_path)
-                return transcript_path, "publisher_transcript"
-            transcribed = _transcribe_available_audio(item, settings)
-            if transcribed:
-                write_raw_transcript(item, transcribed, transcript_path)
-                return transcript_path, transcription_method(settings)
+        if not cached_text.lower().startswith("transcript unavailable"):
+            return transcript_path, "cached"
+        # A cached "unavailable" marker is not permanent: retry acquisition so
+        # captions or transcripts published later win. Skip the yt-dlp audio
+        # download here, though — it already failed to produce a transcript
+        # once, and re-downloading full audio every run for a stuck item is
+        # expensive.
+        text, method = _acquire_transcript(item, settings, include_audio_download=False)
+        if not text:
             return transcript_path, "unavailable"
-        return transcript_path, "cached"
+        write_raw_transcript(item, text, transcript_path)
+        return transcript_path, method
 
-    text = publisher_transcript or _existing_text_transcript(item)
-    method = "publisher_transcript" if publisher_transcript else _existing_text_method(item)
-
-    if not text and item.source_type == "youtube":
-        text = fetch_youtube_captions(item.url)
-        method = "youtube_captions"
-
+    text, method = _acquire_transcript(item, settings)
     if not text:
-        text = _transcribe_available_audio(item, settings)
-        if text:
-            method = transcription_method(settings)
+        return None, "unavailable"
+    transcript_path = write_raw_transcript(item, text, transcript_path)
+    return transcript_path, method
 
-    if not text and item.source_type == "youtube" and can_transcribe(settings):
+
+def _acquire_transcript(
+    item: MediaItem,
+    settings: Settings,
+    *,
+    include_audio_download: bool = True,
+) -> tuple[str | None, str]:
+    publisher_transcript = _publisher_transcript(item)
+    if publisher_transcript:
+        return publisher_transcript, "publisher_transcript"
+
+    text = _existing_text_transcript(item)
+    if text:
+        return text, _existing_text_method(item)
+
+    if item.source_type == "youtube":
+        text = fetch_youtube_captions(item.url)
+        if text:
+            return text, "youtube_captions"
+
+    text = _transcribe_available_audio(item, settings)
+    if text:
+        return text, transcription_method(settings)
+
+    if include_audio_download and item.source_type == "youtube" and can_transcribe(settings):
         media_path = download_youtube_audio(item.url, item.id)
         if media_path:
             text = _transcribe_media_file(media_path, settings)
-            method = transcription_method(settings)
+            if text:
+                return text, transcription_method(settings)
 
-    if not text:
-        return None, "unavailable"
-
-    transcript_path = write_raw_transcript(item, text, transcript_path)
-    return transcript_path, method
+    return None, "unavailable"
 
 
 def _existing_text_transcript(item: MediaItem) -> str | None:
@@ -70,11 +87,20 @@ def _publisher_transcript(item: MediaItem) -> str | None:
     if item.source_type != "podcast" or not item.description:
         return None
     description = item.description.strip()
-    lowered = description.lower()
-    marker_index = lowered.find("transcript")
-    if marker_index == -1:
+    # Require the "Transcript" marker to start a line — either as a
+    # heading-like label ("Transcript", "# Full Transcript", "=== Transcript
+    # ===") or with the text following a colon on the same line — so prose
+    # such as "a full transcript is available at ..." in show notes is not
+    # mistaken for the transcript itself.
+    marker = re.search(
+        r"(?im)^[#>*=\s-]*(?:full\s+|episode\s+|show\s+)?transcripts?\s*[:*=\s-]*$"
+        r"|^(?:full\s+|episode\s+|show\s+)?transcripts?\s*:\s*\S"
+        r"|^transcripts?\b[^\n]{0,30}:\s*$",
+        description,
+    )
+    if marker is None:
         return None
-    transcript = description[marker_index:]
+    transcript = description[marker.start():]
     # Substack adds this footer after public podcast descriptions.
     footer_index = transcript.lower().find("this is a public episode")
     if footer_index != -1:

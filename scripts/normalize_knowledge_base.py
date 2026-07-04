@@ -11,7 +11,7 @@ from source_registry import load_source_registry
 from summary_metadata import normalize_speakers
 from summarize import is_placeholder_summary, strip_ai_response_wrappers
 from resources import readable_resource_filename
-from utils import read_text, split_frontmatter, write_text, yaml_value
+from utils import as_bool, read_text, split_frontmatter, write_text, yaml_value
 
 
 RESOURCE_FIELDS = [
@@ -143,6 +143,9 @@ def _frontmatter(
     omit_empty: bool = False,
 ) -> str:
     lines = ["---"]
+    send_to_kindle_line = None
+    if "priority" in ordered_fields or "send_to_kindle" in fields:
+        send_to_kindle_line = f"send_to_kindle: {yaml_value(as_bool(fields.get('send_to_kindle', True)))}"
     for key in ordered_fields:
         value = fields.get(key, "")
         if omit_empty and (value == "" or value is None or value == []):
@@ -153,10 +156,11 @@ def _frontmatter(
                 lines.append(f"  - {yaml_value(item)}")
         else:
             lines.append(f"{key}: {yaml_value(value)}")
-        if key == "priority":
-            lines.append(f"send_to_kindle: {yaml_value(_as_bool(fields.get('send_to_kindle', True)))}")
-    if "send_to_kindle" in fields and "priority" not in ordered_fields:
-        lines.append(f"send_to_kindle: {yaml_value(_as_bool(fields.get('send_to_kindle', True)))}")
+        if key == "priority" and send_to_kindle_line:
+            lines.append(send_to_kindle_line)
+            send_to_kindle_line = None
+    if send_to_kindle_line:
+        lines.append(send_to_kindle_line)
     if tags:
         lines.append("tags:")
         for tag in tags:
@@ -176,7 +180,10 @@ def _clean_embedded_ai_wrapper(body: str) -> str:
     lines = body.splitlines()
     for index, line in enumerate(lines):
         lowered = line.strip().lower()
-        if "markdown" not in lowered or "here is" not in lowered:
+        # Only treat a line as an AI response wrapper when it looks like a
+        # preamble ("Here is the markdown summary:"), not prose that merely
+        # mentions both words.
+        if "markdown" not in lowered or "here is" not in lowered or not lowered.endswith(":"):
             continue
         before = "\n".join(lines[:index]).rstrip()
         cleaned = strip_ai_response_wrappers("\n".join(lines[index:]))
@@ -207,7 +214,6 @@ def _aliases(existing: object, *required: str) -> list[str]:
 def _infer_source_name(fields: dict[str, Any]) -> str:
     registry = load_source_registry()
     origin = str(fields.get("origin") or "")
-    url = str(fields.get("url") or "")
     source = str(fields.get("source") or "unknown")
     for podcast in registry.get("podcasts", []):
         if origin and origin == podcast.get("rssUrl"):
@@ -215,17 +221,7 @@ def _infer_source_name(fields: dict[str, Any]) -> str:
     youtube_channels = registry.get("youtube_channels", [])
     if source == "youtube" and len(youtube_channels) == 1:
         return str(youtube_channels[0].get("name") or source)
-    if url:
-        return source
     return source
-
-
-def _as_bool(value: object) -> bool:
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        return value.strip().lower() not in {"false", "0", "no", "off"}
-    return bool(value)
 
 
 if __name__ == "__main__":

@@ -12,7 +12,7 @@ from pathlib import Path
 
 from config import Settings
 from project_paths import METADATA, ROOT
-from utils import read_json, write_json
+from utils import read_json, write_json, write_text
 
 PLACEHOLDER_EMAILS = {"yourname_123@kindle.com", "you@example.com"}
 DELIVERY_LEDGER = METADATA / "kindle_delivery.json"
@@ -63,19 +63,7 @@ def _send_with_smtp(file_path: Path, kindle: dict, recipient: str) -> str:
     if missing:
         return f"Kindle delivery skipped: missing {', '.join(missing)}."
 
-    message = EmailMessage()
-    message["Subject"] = file_path.stem
-    message["From"] = sender
-    message["To"] = recipient
-    message.set_content("Attached is your weekly media digest.")
-    content_type = mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
-    maintype, subtype = content_type.split("/", 1)
-    message.add_attachment(
-        file_path.read_bytes(),
-        maintype=maintype,
-        subtype=subtype,
-        filename=file_path.name,
-    )
+    message = _build_message(file_path, sender, recipient)
 
     with smtplib.SMTP(kindle.get("smtp_host", "smtp.gmail.com"), int(kindle.get("smtp_port", 587))) as smtp:
         smtp.starttls()
@@ -99,6 +87,13 @@ def _send_with_gmail_api(file_path: Path, kindle: dict, recipient: str) -> str:
     except Exception as exc:
         return f"Kindle delivery skipped: Gmail OAuth failed. {exc}"
 
+    message = _build_message(file_path, sender, recipient)
+    encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
+    service.users().messages().send(userId="me", body={"raw": encoded_message}).execute()
+    return f"Sent {file_path.name} to {recipient} with Gmail API."
+
+
+def _build_message(file_path: Path, sender: str, recipient: str) -> EmailMessage:
     message = EmailMessage()
     message["Subject"] = file_path.stem
     message["From"] = sender
@@ -112,9 +107,7 @@ def _send_with_gmail_api(file_path: Path, kindle: dict, recipient: str) -> str:
         subtype=subtype,
         filename=file_path.name,
     )
-    encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
-    service.users().messages().send(userId="me", body={"raw": encoded_message}).execute()
-    return f"Sent {file_path.name} to {recipient} with Gmail API."
+    return message
 
 
 def _gmail_service(kindle: dict):
@@ -138,7 +131,7 @@ def _gmail_service(kindle: dict):
     creds = Credentials.from_authorized_user_file(str(token_path), [GMAIL_SEND_SCOPE])
     if creds and creds.expired and creds.refresh_token:
         creds.refresh(Request())
-        token_path.write_text(creds.to_json(), encoding="utf-8")
+        write_private_file(token_path, creds.to_json())
     if not creds or not creds.valid:
         raise RuntimeError("Gmail token is invalid. Run scripts/setup_gmail_oauth.py again.")
     return build("gmail", "v1", credentials=creds)
@@ -149,6 +142,12 @@ def private_path(value: object, default: str) -> Path:
     if path.is_absolute():
         return path
     return ROOT / path
+
+
+def write_private_file(path: Path, content: str) -> None:
+    # OAuth tokens grant live send access; keep them out of reach of other
+    # local users, and never leave a truncated token behind.
+    write_text(path, content, mode=0o600)
 
 
 def _send_with_apple_mail(file_path: Path, kindle: dict, recipient: str) -> str:
@@ -201,7 +200,7 @@ def _apple_mail_account_count() -> tuple[int, str]:
         check=False,
     )
     if result.returncode != 0:
-        return 0, ""
+        return 0, (result.stderr or result.stdout).strip()
     try:
         return int(result.stdout.strip()), ""
     except ValueError:
