@@ -15,6 +15,7 @@ class Settings:
     timezone: str
     summary_provider: str
     summary_model: str
+    summary_fallback_model: str
     summary_mode: str
     transcription_provider: str
     transcription_model: str
@@ -42,6 +43,7 @@ def load_settings(path: Path | None = None) -> Settings:
         timezone=raw.get("timezone", "America/Chicago"),
         summary_provider=raw.get("summary_provider", "mistral"),
         summary_model=raw.get("summary_model", "mistral-small-latest"),
+        summary_fallback_model=raw.get("summary_fallback_model", "mistral-medium-latest"),
         summary_mode=raw.get("summary_mode", "batch"),
         transcription_provider=raw.get("transcription_provider", "mistral"),
         transcription_model=raw.get("transcription_model", "voxtral-mini-latest"),

@@ -52,7 +52,8 @@ Each run checks the configured source inspection windows, filters recurring sour
 ## Mistral
 
 - Read `MISTRAL_API_KEY` from `.env` or the shell.
-- Default summaries use Mistral Batch API.
+- Default summaries use Mistral Batch API with `mistral-small-latest`.
+- If the small-model batch fails or returns unusable structured summaries, cancel it if possible and retry the batch once with `summary_fallback_model`, defaulting to `mistral-medium-latest`.
 - Transcription fallback uses Mistral transcription after publisher transcripts and YouTube captions fail.
 - If Batch returns billing/access errors, check `scripts/check_mistral_access.py --batch` and temporarily use `"summary_mode": "direct"` only if needed.
 

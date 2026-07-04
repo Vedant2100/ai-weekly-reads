@@ -43,6 +43,19 @@ Original link: {url}
 {priority}
 """
 
+REQUIRED_SUMMARY_HEADINGS = (
+    "## One-Sentence Takeaway",
+    "## Short Summary",
+    "## Featured Speakers",
+    "## Topics",
+    "## Main Ideas",
+    "## Questions And Answers",
+    "## Notable Details",
+    "## Actionable Takeaways",
+    "## People, Companies, Tools, And Links Mentioned",
+    "## Reading Priority",
+)
+
 
 def get_or_create_summary(item: MediaItem, transcript_path: Path, settings: Settings) -> Path:
     summary_path = SUMMARIES / f"{item.id}.md"
@@ -160,6 +173,16 @@ def strip_ai_response_wrappers(content: str) -> str:
         if not prefix or "markdown" in prefix or "here is" in prefix or len(prefix.split()) <= 20:
             stripped = stripped[heading_index:]
     return stripped.strip()
+
+
+def summary_quality_issue(content: str) -> str | None:
+    stripped = strip_ai_response_wrappers(content)
+    if len(stripped.split()) < 80:
+        return "summary is unexpectedly short"
+    missing = [heading for heading in REQUIRED_SUMMARY_HEADINGS if heading not in stripped]
+    if missing:
+        return f"missing required headings: {', '.join(missing)}"
+    return None
 
 
 def strip_outer_markdown_fence(content: str) -> str:

@@ -3,6 +3,7 @@
   "timezone": "America/Chicago",
   "summary_provider": "mistral",
   "summary_model": "mistral-small-latest",
+  "summary_fallback_model": "mistral-medium-latest",
   "summary_mode": "batch",
   "transcription_provider": "mistral",
   "transcription_model": "voxtral-mini-latest",

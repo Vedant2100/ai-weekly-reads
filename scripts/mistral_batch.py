@@ -9,7 +9,7 @@ from pathlib import Path
 from config import Settings
 from project_paths import SUMMARIES
 from sources import MediaItem
-from summarize import format_ai_summary, mistral_chat_payload
+from summarize import format_ai_summary, mistral_chat_payload, summary_quality_issue
 from transcript_store import read_transcript_text
 from utils import write_text
 
@@ -24,6 +24,7 @@ def summarize_with_mistral_batch(
     batch_items: list[SummaryBatchItem],
     settings: Settings,
     *,
+    model: str | None = None,
     poll_seconds: int = 20,
     timeout_seconds: int = 60 * 60,
 ) -> dict[str, Path]:
@@ -38,10 +39,22 @@ def summarize_with_mistral_batch(
         raise RuntimeError("Install the Mistral SDK with `pip install mistralai`.") from exc
 
     client = Mistral(api_key=os.environ["MISTRAL_API_KEY"])
+    batch_model = model or settings.summary_model
     requests = [_batch_request(batch_item, settings) for batch_item in batch_items]
+    return _run_batch_job(client, batch_items, requests, batch_model, poll_seconds, timeout_seconds)
+
+
+def _run_batch_job(
+    client,
+    batch_items: list[SummaryBatchItem],
+    requests: list[dict],
+    model: str,
+    poll_seconds: int,
+    timeout_seconds: int,
+) -> dict[str, Path]:
     job = client.batch.jobs.create(
         endpoint="/v1/chat/completions",
-        model=settings.summary_model,
+        model=model,
         requests=requests,
         metadata={"project": "ai-weekly-reads", "job_type": "resource-summary"},
     )
@@ -49,36 +62,48 @@ def summarize_with_mistral_batch(
     if not job_id:
         raise RuntimeError(f"Mistral batch job was created without an id: {job!r}")
 
-    print(f"Mistral batch job submitted: {job_id} ({len(batch_items)} summaries)")
-    job = _wait_for_batch(client, job_id, poll_seconds, timeout_seconds)
-    status = str(_get_attr(job, "status", "")).upper()
-    if status not in {"SUCCESS", "SUCCEEDED", "COMPLETED"}:
-        raise RuntimeError(f"Mistral batch job {job_id} finished with status {status}: {job!r}")
+    print(f"Mistral batch job submitted: {job_id} using {model} ({len(batch_items)} summaries)")
+    try:
+        job = _wait_for_batch(client, job_id, poll_seconds, timeout_seconds)
+        status = str(_get_attr(job, "status", "")).upper()
+        if status not in {"SUCCESS", "SUCCEEDED", "COMPLETED"}:
+            raise RuntimeError(f"Mistral batch job {job_id} finished with status {status}: {job!r}")
 
-    output_file = _get_attr(job, "output_file")
-    if not output_file:
-        raise RuntimeError(f"Mistral batch job {job_id} did not return an output file.")
+        output_file = _get_attr(job, "output_file")
+        if not output_file:
+            raise RuntimeError(f"Mistral batch job {job_id} did not return an output file.")
 
-    response = client.files.download(file_id=output_file)
-    results = _parse_jsonl_response(response)
-    item_by_id = {batch_item.item.id: batch_item.item for batch_item in batch_items}
-    summary_paths: dict[str, Path] = {}
-    for row in results:
-        custom_id = str(row.get("custom_id", ""))
-        item = item_by_id.get(custom_id)
-        if not item:
-            continue
-        content = _extract_content(row)
-        if not content:
-            raise RuntimeError(f"Mistral batch result for {custom_id} did not include summary text: {row!r}")
-        summary_path = SUMMARIES / f"{item.id}.md"
-        write_text(summary_path, format_ai_summary(item, content))
-        summary_paths[item.id] = summary_path
+        response = client.files.download(file_id=output_file)
+        results = _parse_jsonl_response(response)
+        item_by_id = {batch_item.item.id: batch_item.item for batch_item in batch_items}
+        content_by_id: dict[str, str] = {}
+        for row in results:
+            custom_id = str(row.get("custom_id", ""))
+            item = item_by_id.get(custom_id)
+            if not item:
+                continue
+            content = _extract_content(row)
+            if not content:
+                raise RuntimeError(f"Mistral batch result for {custom_id} did not include summary text: {row!r}")
+            issue = summary_quality_issue(content)
+            if issue:
+                raise RuntimeError(f"Mistral batch result for {custom_id} was not usable: {issue}")
+            content_by_id[item.id] = content
 
-    missing = sorted(set(item_by_id) - set(summary_paths))
-    if missing:
-        raise RuntimeError(f"Mistral batch output was missing summaries for: {', '.join(missing)}")
-    return summary_paths
+        missing = sorted(set(item_by_id) - set(content_by_id))
+        if missing:
+            raise RuntimeError(f"Mistral batch output was missing summaries for: {', '.join(missing)}")
+
+        summary_paths: dict[str, Path] = {}
+        for item_id, content in content_by_id.items():
+            item = item_by_id[item_id]
+            summary_path = SUMMARIES / f"{item.id}.md"
+            write_text(summary_path, format_ai_summary(item, content))
+            summary_paths[item.id] = summary_path
+        return summary_paths
+    except Exception:
+        _cancel_batch_job(client, job_id, model)
+        raise
 
 
 def _batch_request(batch_item: SummaryBatchItem, settings: Settings) -> dict:
@@ -114,6 +139,14 @@ def _wait_for_batch(client, job_id: str, poll_seconds: int, timeout_seconds: int
         if time.monotonic() >= deadline:
             raise TimeoutError(f"Mistral batch job {job_id} did not finish within {timeout_seconds}s")
         time.sleep(poll_seconds)
+
+
+def _cancel_batch_job(client, job_id: str, model: str) -> None:
+    try:
+        client.batch.jobs.cancel(job_id=job_id)
+        print(f"Mistral batch job cancelled: {job_id} ({model})")
+    except Exception as exc:
+        print(f"Mistral batch job cancellation skipped for {job_id} ({model}): {exc}")
 
 
 def _parse_jsonl_response(response) -> list[dict]:

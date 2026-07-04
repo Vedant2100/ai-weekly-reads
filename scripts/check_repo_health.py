@@ -83,6 +83,10 @@ def _check_settings(path: Path, errors: list[str]) -> None:
         errors.append(f"{label}: summary_mode must be 'batch' or 'direct'.")
     if settings.summary_provider not in {"mistral", "local"}:
         errors.append(f"{label}: summary_provider must be 'mistral' or 'local'.")
+    if not str(settings.summary_model or "").strip():
+        errors.append(f"{label}: summary_model must not be empty.")
+    if not str(settings.summary_fallback_model or "").strip():
+        errors.append(f"{label}: summary_fallback_model must not be empty.")
     if settings.transcription_provider not in {"mistral", "none"}:
         errors.append(f"{label}: transcription_provider must be 'mistral' or 'none'.")
     if settings.kindle_output_format.lower() not in {"epub", "markdown", "md"}:

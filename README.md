@@ -224,6 +224,7 @@ MISTRAL_API_KEY=your-api-key
 Default models are configured in `config/settings.json`:
 
 - summaries: `mistral-small-latest`
+- fallback summaries: `mistral-medium-latest` when a batch job fails or returns unusable structured summaries
 - transcription: configurable in `config/settings.json`
 
 ### Kindle

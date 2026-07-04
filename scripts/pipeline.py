@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -94,10 +94,23 @@ def update_knowledge_base(settings: Settings) -> RunStats:
         try:
             summarize_with_mistral_batch(batch_items, settings)
         except Exception as exc:
-            print(f"Mistral batch summary failed, falling back to direct summaries: {exc}")
-            for batch_item in batch_items:
-                get_or_create_summary(batch_item.item, batch_item.transcript_path, settings)
-                stats.direct_summaries += 1
+            fallback_settings = _fallback_summary_settings(settings)
+            if fallback_settings:
+                print(
+                    "Mistral batch summary failed with "
+                    f"{settings.summary_model}; retrying with {fallback_settings.summary_model}: {exc}"
+                )
+                try:
+                    summarize_with_mistral_batch(batch_items, fallback_settings)
+                except Exception as fallback_exc:
+                    print(
+                        "Mistral fallback batch summary failed, "
+                        f"falling back to direct summaries with {fallback_settings.summary_model}: {fallback_exc}"
+                    )
+                    _run_direct_summaries(batch_items, fallback_settings, stats)
+            else:
+                print(f"Mistral batch summary failed, falling back to direct summaries: {exc}")
+                _run_direct_summaries(batch_items, settings, stats)
 
     for item, transcript_path, transcript_method, row in ready_items:
         summary_path = summary_path_for(item)
@@ -249,6 +262,19 @@ def _batch_summaries_enabled(settings) -> bool:
         and settings.summary_mode == "batch"
         and bool(os.environ.get("MISTRAL_API_KEY"))
     )
+
+
+def _fallback_summary_settings(settings: Settings) -> Settings | None:
+    fallback_model = settings.summary_fallback_model.strip()
+    if not fallback_model or fallback_model == settings.summary_model:
+        return None
+    return replace(settings, summary_model=fallback_model)
+
+
+def _run_direct_summaries(batch_items: list[SummaryBatchItem], settings: Settings, stats: RunStats) -> None:
+    for batch_item in batch_items:
+        get_or_create_summary(batch_item.item, batch_item.transcript_path, settings)
+        stats.direct_summaries += 1
 
 
 def _run_limit_reached(item_count: int, max_items_per_run: int) -> bool:
