@@ -92,10 +92,6 @@ def is_placeholder_summary(summary: str) -> bool:
     )
 
 
-def has_real_transcript(transcript: str) -> bool:
-    return _has_real_transcript(transcript)
-
-
 def _mistral_summary(item: MediaItem, transcript: str, settings: Settings) -> str:
     try:
         response = _post_mistral_summary(item, transcript, settings)

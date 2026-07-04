@@ -78,7 +78,7 @@ def update_knowledge_base(settings: Settings) -> RunStats:
 
         summary_path = summary_path_for(item)
         summary_needs_refresh = should_refresh_summary(summary_path, settings)
-        if _should_batch_summary(summary_path, settings):
+        if summary_needs_refresh and _batch_summaries_enabled(settings):
             ready_items.append((item, transcript_path, transcript_method, row))
             batch_items.append(SummaryBatchItem(item=item, transcript_path=transcript_path))
             stats.batch_summaries += 1
@@ -120,6 +120,7 @@ def discover_items(settings: Settings, publication_cutoff: date | None, stats: R
                 source_name=source_name,
                 content_type=content_type,
                 filter_by_publication_window=True,
+                require_publication_date=True,
             )
             for url in latest_channel_video_urls([channel])
         )
@@ -137,7 +138,7 @@ def discover_items(settings: Settings, publication_cutoff: date | None, stats: R
                 item.source_name = link.source_name
             if link.content_type and not item.content_type:
                 item.content_type = link.content_type
-            added = _add_item(
+            _add_item(
                 item,
                 settings,
                 publication_cutoff,
@@ -145,11 +146,10 @@ def discover_items(settings: Settings, publication_cutoff: date | None, stats: R
                 items,
                 seen_item_ids,
                 filter_by_publication_window=link.filter_by_publication_window,
+                require_publication_date=link.require_publication_date,
             )
             if _run_limit_reached(len(items), settings.max_items_per_run):
                 break
-            if not added:
-                continue
         if _run_limit_reached(len(items), settings.max_items_per_run):
             break
     return items
@@ -181,13 +181,6 @@ def build_weekly_artifacts(settings: Settings) -> BuildArtifacts | None:
         substack_path=substack_path,
         weekly_resource_count=len(weekly_resources),
     )
-
-
-def build_weekly_book(settings: Settings) -> tuple[Path, Path, int] | None:
-    artifacts = build_weekly_artifacts(settings)
-    if not artifacts:
-        return None
-    return artifacts.digest_path, artifacts.kindle_path, artifacts.weekly_resource_count
 
 
 def deliver_to_kindle(kindle_path: Path, settings: Settings, *, force: bool = False) -> str:
@@ -227,8 +220,11 @@ def _add_item(
     seen_item_ids: set[str],
     *,
     filter_by_publication_window: bool,
+    require_publication_date: bool = False,
 ) -> bool:
-    if filter_by_publication_window and not _in_publication_window(item, publication_cutoff):
+    if filter_by_publication_window and not _in_publication_window(
+        item, publication_cutoff, require_publication_date=require_publication_date
+    ):
         stats.skipped_outside_window += 1
         return False
     if _run_limit_reached(len(items), settings.max_items_per_run):
@@ -240,19 +236,20 @@ def _add_item(
     return True
 
 
-def _in_publication_window(item: MediaItem, cutoff: date | None) -> bool:
+def _in_publication_window(item: MediaItem, cutoff: date | None, *, require_publication_date: bool = False) -> bool:
     if cutoff is None:
         return True
     published = parse_date(item.published)
-    return published is None or published >= cutoff
+    if published is None:
+        return not require_publication_date
+    return published >= cutoff
 
 
-def _should_batch_summary(summary_path, settings) -> bool:
+def _batch_summaries_enabled(settings) -> bool:
     return (
         settings.summary_provider == "mistral"
         and settings.summary_mode == "batch"
         and bool(os.environ.get("MISTRAL_API_KEY"))
-        and should_refresh_summary(summary_path, settings)
     )
 
 

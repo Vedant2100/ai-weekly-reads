@@ -44,7 +44,7 @@ class MediaItem:
 def read_inbox(path: Path, configured_feeds: Iterable[str]) -> list[str]:
     links: list[str] = []
     if path.exists():
-        for line in path.read_text(encoding="utf-8").splitlines():
+        for line in path.read_text(encoding="utf-8-sig").splitlines():
             line = line.strip()
             if line and not line.startswith("#"):
                 links.append(line)
@@ -169,8 +169,8 @@ def _youtube_item(url: str) -> MediaItem:
         upload_date = info.get("upload_date")
         if upload_date and len(upload_date) == 8:
             published = f"{upload_date[:4]}-{upload_date[4:6]}-{upload_date[6:]}"
-    except Exception:
-        pass
+    except Exception as exc:
+        print(f"Could not fetch YouTube metadata for {url}: {exc}")
     return MediaItem(
         id=stable_id(url),
         url=url,

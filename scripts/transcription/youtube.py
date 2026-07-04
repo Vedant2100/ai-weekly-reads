@@ -43,7 +43,15 @@ def download_youtube_audio(url: str, item_id: str) -> Path | None:
         subprocess.run(command, check=True, capture_output=True, text=True)
     except Exception:
         return None
-    matches = list(MEDIA.glob(f"{item_id}.*"))
+    mp3_path = MEDIA / f"{item_id}.mp3"
+    if mp3_path.exists():
+        return mp3_path
+    matches = sorted(
+        path
+        for path in MEDIA.glob(f"{item_id}.*")
+        # Never pick up truncated yt-dlp intermediates from a crashed run.
+        if path.suffix.lower() not in {".part", ".ytdl", ".tmp"}
+    )
     return matches[0] if matches else None
 
 

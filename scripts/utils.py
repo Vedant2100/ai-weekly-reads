@@ -41,7 +41,11 @@ def read_text(path: Path) -> str:
 
 def write_text(path: Path, value: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(value, encoding="utf-8")
+    # Write via a temp file so a crash mid-write can't leave a truncated
+    # resource or transcript that later parses as frontmatter-less.
+    tmp_path = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    tmp_path.write_text(value, encoding="utf-8")
+    os.replace(tmp_path, path)
 
 
 def yaml_value(value: Any) -> str:
@@ -125,7 +129,7 @@ def strip_graph_only_sections(markdown: str) -> str:
 def load_dotenv(path: Path) -> None:
     if not path.exists():
         return
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for line in path.read_text(encoding="utf-8-sig").splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
@@ -168,10 +172,10 @@ def is_url(value: str) -> bool:
 
 def youtube_video_id(url: str) -> str | None:
     parsed = urlparse(url)
-    host = parsed.netloc.lower()
-    if host.endswith("youtu.be"):
+    host = parsed.netloc.lower().rsplit("@", 1)[-1].split(":", 1)[0]
+    if host == "youtu.be":
         return parsed.path.strip("/") or None
-    if "youtube.com" in host:
+    if host == "youtube.com" or host.endswith(".youtube.com"):
         query_id = parse_qs(parsed.query).get("v", [None])[0]
         if query_id:
             return query_id

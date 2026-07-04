@@ -31,8 +31,11 @@ class Settings:
 
 
 def load_settings(path: Path | None = None) -> Settings:
+    explicit = path is not None
     path = path or CONFIG / "settings.json"
     fallback = CONFIG / "settings.example.json"
+    if explicit and not path.exists():
+        raise FileNotFoundError(f"Settings file not found: {path}")
     raw = read_json(path if path.exists() else fallback, {})
     return Settings(
         digest_title=raw.get("digest_title", "AI Weekly Reads"),
@@ -104,7 +107,12 @@ def _set_env_value(kindle: dict[str, Any], key: str, env_name: str, transform=No
     value = os.environ.get(env_name)
     if value is None or value == "":
         return
-    kindle[key] = transform(value) if transform else value
+    if transform:
+        try:
+            value = transform(value)
+        except (TypeError, ValueError) as exc:
+            raise SystemExit(f"Invalid value for {env_name}: {value!r}") from exc
+    kindle[key] = value
 
 
 def _as_bool(value: str) -> bool:

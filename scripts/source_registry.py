@@ -15,6 +15,11 @@ class RegistryLink:
     source_name: str | None = None
     content_type: str | None = None
     filter_by_publication_window: bool = False
+    # When True, items whose publication date could not be resolved are
+    # treated as outside the window instead of inside it. Channel discovery
+    # sets this so a transient yt-dlp metadata failure cannot flood a run
+    # with the full lookback backlog.
+    require_publication_date: bool = False
 
 
 def load_source_registry(path: Path | None = None) -> dict[str, Any]:
