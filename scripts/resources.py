@@ -95,6 +95,8 @@ def list_resources(limit: int | None = None, since: date | None = None) -> list[
     resources: list[tuple[Path, dict]] = []
     for path in RESOURCES.glob("*.md"):
         fields = _resource_fields(path)
+        if not _send_to_kindle_enabled(fields):
+            continue
         if fields.get("status") == "summarized" and _resource_fields_in_window(fields, since):
             resources.append((path, fields))
 
@@ -112,6 +114,13 @@ def is_summarized_resource(path: Path) -> bool:
 def _resource_fields(path: Path) -> dict:
     fields, _body = split_frontmatter(read_text(path))
     return fields
+
+
+def _send_to_kindle_enabled(fields: dict) -> bool:
+    value = fields.get("send_to_kindle", True)
+    if isinstance(value, str):
+        return value.strip().lower() not in {"false", "0", "no", "off"}
+    return bool(value)
 
 
 def _resource_fields_in_window(fields: dict, since: date | None) -> bool:

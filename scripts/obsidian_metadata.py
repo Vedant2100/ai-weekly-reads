@@ -188,9 +188,29 @@ def obsidian_aliases(*values: object) -> list[str]:
 
 
 def resource_tags(markdown: str, title: str = "", existing: object | None = None) -> list[str]:
-    explicit = _section_topics(markdown)
-    topics = explicit or _infer_topics(markdown, title)
+    topics = _existing_topics(existing) or _section_topics(markdown) or _infer_topics(markdown, title)
+    if len(topics) < 2:
+        for topic in [*_section_topics(markdown), *_infer_topics(markdown, title)]:
+            if len(topics) >= 2:
+                break
+            if topic not in topics:
+                topics.append(topic)
     return topics[:4]
+
+
+def _existing_topics(existing: object) -> list[str]:
+    if not isinstance(existing, list):
+        return []
+    topics: list[str] = []
+    for value in existing:
+        text = str(value).strip().removeprefix("#")
+        slug = text.removeprefix("topic/").strip()
+        if not text.startswith("topic/") or not slug:
+            continue
+        topic = _canonical_topic(text) or f"topic/{_tag_segment(slug)}"
+        if topic not in topics:
+            topics.append(topic)
+    return topics
 
 
 def raw_transcript_tags(_source: str = "", _existing: object | None = None) -> list[str]:
