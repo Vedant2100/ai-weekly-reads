@@ -62,8 +62,20 @@ def get_or_create_summary(item: MediaItem, transcript_path: Path, settings: Sett
     if summary_path.exists() and not should_refresh_summary(summary_path, settings):
         return summary_path
 
+    if item.source_type == "pdf_document" or str(transcript_path).lower().endswith(".pdf"):
+        if settings.summary_provider == "gemini" or os.environ.get("GEMINI_API_KEY"):
+            from gemini_ai import summarize_pdf_gemini
+            summary = summarize_pdf_gemini(item, transcript_path, settings)
+        else:
+            summary = _local_summary(item, "PDF document requires Gemini API key.", settings)
+        write_text(summary_path, summary)
+        return summary_path
+
     transcript = read_transcript_text(transcript_path)
-    if settings.summary_provider == "mistral" and os.environ.get("MISTRAL_API_KEY") and _has_real_transcript(transcript):
+    if (settings.summary_provider == "gemini" or os.environ.get("GEMINI_API_KEY")) and _has_real_transcript(transcript):
+        from gemini_ai import gemini_summary
+        summary = gemini_summary(item, transcript, settings)
+    elif settings.summary_provider == "mistral" and os.environ.get("MISTRAL_API_KEY") and _has_real_transcript(transcript):
         summary = _mistral_summary(item, transcript, settings)
     else:
         summary = _local_summary(item, transcript, settings)
@@ -80,13 +92,14 @@ def should_refresh_summary(summary_path: Path, settings: Settings) -> bool:
     if not summary_path.exists():
         return True
     summary = read_text(summary_path)
-    if os.environ.get("MISTRAL_API_KEY") and "AI summary is not enabled yet" in summary:
+    has_key = bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("MISTRAL_API_KEY"))
+    if has_key and "AI summary is not enabled yet" in summary:
         return True
-    if os.environ.get("MISTRAL_API_KEY") and "Not generated in local fallback mode" in summary:
+    if has_key and "Not generated in local fallback mode" in summary:
         return True
-    if os.environ.get("MISTRAL_API_KEY") and "Transcript excerpt:" in summary:
+    if has_key and "Transcript excerpt:" in summary:
         return True
-    if os.environ.get("MISTRAL_API_KEY") and "Mistral summary failed" in summary:
+    if has_key and ("Mistral summary failed" in summary or "Gemini summary failed" in summary):
         return True
     return False
 
@@ -101,6 +114,7 @@ def is_placeholder_summary(summary: str) -> bool:
         "AI summary is not enabled yet" in summary
         or "Not generated in local fallback mode" in summary
         or "Mistral summary failed" in summary
+        or "Gemini summary failed" in summary
         or "AI summary failed" in summary
     )
 
@@ -251,7 +265,7 @@ def _local_summary(item: MediaItem, transcript: str, settings: Settings, note: s
     if note:
         overview = note
     else:
-        overview = "AI summary is not enabled yet. Set MISTRAL_API_KEY to generate structured summaries with Mistral AI."
+        overview = "AI summary is not enabled yet. Set GEMINI_API_KEY to generate structured summaries with Google Gemini."
     return SUMMARY_TEMPLATE.format(
         title=item.title,
         source_type=item.source_type,

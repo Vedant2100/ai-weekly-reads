@@ -8,11 +8,32 @@ from config import Settings
 from sources import MediaItem
 from transcript_store import find_raw_transcript, read_transcript_text, write_raw_transcript
 from transcription.media import download_direct_media
-from transcription.mistral import can_transcribe, transcribe_audio_url, transcribe_media_file, transcription_method
+from transcription.mistral import (
+    can_transcribe as mistral_can_transcribe,
+    transcribe_audio_url as mistral_transcribe_audio_url,
+    transcribe_media_file as mistral_transcribe_media_file,
+    transcription_method as mistral_transcription_method,
+)
 from transcription.youtube import download_youtube_audio, fetch_youtube_captions
 
 
 def get_or_create_transcript(item: MediaItem, settings: Settings) -> tuple[Path | None, str]:
+    if item.source_type == "pdf_document":
+        from project_paths import RAW_TRANSCRIPTS
+        import requests
+        pdf_path = RAW_TRANSCRIPTS / f"{item.id}.pdf"
+        if pdf_path.exists():
+            return pdf_path, "cached"
+        try:
+            print(f"Downloading PDF: {item.url}")
+            resp = requests.get(item.url, timeout=30, headers={"User-Agent": "AIWeeklyReads/0.1"})
+            resp.raise_for_status()
+            pdf_path.write_bytes(resp.content)
+            return pdf_path, "pdf_download"
+        except Exception as exc:
+            print(f"Notice: Failed to download PDF {item.url}: {exc}")
+            return None, "unavailable"
+
     transcript_path = find_raw_transcript(item.id)
     if transcript_path and transcript_path.exists():
         cached_text = read_transcript_text(transcript_path)
@@ -111,20 +132,39 @@ def _publisher_transcript(item: MediaItem) -> str | None:
     return transcript
 
 
+def can_transcribe(settings: Settings) -> bool:
+    if settings.transcription_provider == "gemini":
+        import os
+        return bool(os.environ.get("GEMINI_API_KEY"))
+    return mistral_can_transcribe(settings)
+
+
+def transcription_method(settings: Settings) -> str:
+    if settings.transcription_provider == "gemini":
+        return "gemini_transcribe"
+    return mistral_transcription_method(settings)
+
+
 def _transcribe_available_audio(item: MediaItem, settings: Settings) -> str | None:
     if not item.audio_url or not can_transcribe(settings):
         return None
+    if settings.transcription_provider == "gemini":
+        from gemini_ai import transcribe_audio_url_gemini
+        return transcribe_audio_url_gemini(item.audio_url, settings)
     if settings.transcription_provider == "mistral":
-        text = transcribe_audio_url(item.audio_url, settings)
+        text = mistral_transcribe_audio_url(item.audio_url, settings)
         if text:
             return text
         with tempfile.TemporaryDirectory() as tmpdir:
             media_path = download_direct_media(item.audio_url, item.id, Path(tmpdir))
-            return transcribe_media_file(media_path, settings)
+            return mistral_transcribe_media_file(media_path, settings)
     return None
 
 
 def _transcribe_media_file(media_path: Path | None, settings: Settings) -> str | None:
+    if settings.transcription_provider == "gemini":
+        from gemini_ai import transcribe_media_file_gemini
+        return transcribe_media_file_gemini(media_path, settings)
     if settings.transcription_provider == "mistral":
-        return transcribe_media_file(media_path, settings)
+        return mistral_transcribe_media_file(media_path, settings)
     return None

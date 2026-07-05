@@ -65,6 +65,10 @@ def resolve_link(url: str, feed_limit: int = 10) -> list[MediaItem]:
         return [_youtube_item(url)]
     if "spotify.com" in url:
         return [MediaItem(id=stable_id(url), url=url, source_type="spotify", title=url, origin=url)]
+    if "x.com/" in url or "twitter.com/" in url:
+        return [_twitter_item(url)]
+    if url.lower().split("?", 1)[0].endswith(".pdf") or "arxiv.org/pdf/" in url.lower():
+        return [_pdf_item(url)]
     if _looks_like_media_url(url):
         return [
             MediaItem(
@@ -145,6 +149,56 @@ def _entry_published(entry: dict) -> str | None:
     return entry.get("published") or entry.get("updated")
 
 
+def _pdf_item(url: str) -> MediaItem:
+    title = Path(url.split("?", 1)[0]).name or url
+    if "arxiv.org/pdf/" in url.lower() and not title.endswith(".pdf"):
+        title += ".pdf"
+    return MediaItem(
+        id=stable_id(url),
+        url=url,
+        source_type="pdf_document",
+        title=f"PDF Document: {title}",
+        origin=url,
+        content_type="pdf",
+        description=f"PDF link: {url}",
+    )
+
+
+def _twitter_item(url: str) -> MediaItem:
+    api_url = re.sub(r"https?://(www\.)?(x|twitter)\.com", "https://api.fxtwitter.com", url)
+    title = url
+    description = None
+    source_name = None
+    published = None
+    if requests is not None:
+        try:
+            resp = requests.get(api_url, timeout=15, headers={"User-Agent": "AIWeeklyReads/0.1"})
+            if resp.status_code == 200:
+                data = resp.json().get("tweet", {})
+                author = data.get("author", {}).get("name") or data.get("author", {}).get("screen_name")
+                text = data.get("text", "")
+                created = data.get("created_at")
+                if author:
+                    source_name = author
+                    title = f"X Post by {author}"
+                if created:
+                    published = created[:10]
+                description = text
+        except Exception as exc:
+            print(f"Notice: fxtwitter lookup failed for {url}: {exc}")
+    return MediaItem(
+        id=stable_id(url),
+        url=url,
+        source_type="x_post",
+        title=title,
+        origin=url,
+        source_name=source_name,
+        content_type="x_thread",
+        published=published,
+        description=description or f"X (Twitter) Link: {url}",
+    )
+
+
 def _youtube_item(url: str) -> MediaItem:
     title = url
     description = None
@@ -213,6 +267,8 @@ def _parse_web_page(url: str) -> MediaItem:
     try:
         response = requests.get(url, timeout=20, headers={"User-Agent": "AIWeeklyReads/0.1"})
         response.raise_for_status()
+        if response.headers.get("content-type", "").lower().startswith("application/pdf"):
+            return _pdf_item(url)
         soup = BeautifulSoup(response.text, "html.parser")
         if soup.title and soup.title.string:
             title = soup.title.string.strip()

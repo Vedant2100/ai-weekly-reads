@@ -42,18 +42,30 @@ def build_digest(
     if include_period_label:
         lines.extend([f"Week of {stamp}", ""])
     lines.extend([f"[Download the latest EPUB for Kindle]({public_epub_markdown_url()})", ""])
-    lines.extend(["## Contents", ""])
-    for index, resource_path in enumerate(resource_paths, start=1):
-        lines.append(f"{index}. [{_resource_source(resource_path)}] {_resource_date(resource_path)} - {_resource_title(resource_path)}")
-    lines.extend(["", "## Reading Notes", ""])
+    section_groups: dict[str, list[Path]] = {}
+    for r_path in resource_paths:
+        sec_title = _get_resource_section_title(r_path)
+        section_groups.setdefault(sec_title, []).append(r_path)
 
-    for resource_path in resource_paths:
-        resource = read_text(resource_path)
-        summary = _summary_part(resource)
-        lines.append(summary.strip())
+    lines.extend(["## Contents", ""])
+    item_counter = 1
+    for sec_title, p_list in section_groups.items():
+        lines.extend([f"### {sec_title}", ""])
+        for resource_path in p_list:
+            lines.append(f"{item_counter}. [{_resource_source(resource_path)}] {_resource_date(resource_path)} - {_resource_title(resource_path)}")
+            item_counter += 1
         lines.append("")
-        lines.append("***")
-        lines.append("")
+
+    lines.extend(["## Reading Notes", ""])
+    for sec_title, p_list in section_groups.items():
+        lines.extend([f"### {sec_title}", ""])
+        for resource_path in p_list:
+            resource = read_text(resource_path)
+            summary = _summary_part(resource)
+            lines.append(summary.strip())
+            lines.append("")
+            lines.append("***")
+            lines.append("")
 
     public_content = "\n".join(lines).strip() + "\n"
 
@@ -177,3 +189,45 @@ def _transcript_part(resource: str) -> str:
 
 def _digest_line(line: str) -> str:
     return "***" if line.strip() == "---" else line
+
+
+TOPIC_SECTION_TITLES = {
+    "ai-agents": "🤖 AI Agents & Coding Assistants",
+    "coding-agents": "🤖 AI Agents & Coding Assistants",
+    "foundation-models": "🧠 Foundation Models & Architecture",
+    "model-training": "🧠 Foundation Models & Architecture",
+    "model-inference": "🧠 Foundation Models & Architecture",
+    "model-evaluation": "🧠 Foundation Models & Architecture",
+    "retrieval": "⚡ Infrastructure, RAG & Vector Data",
+    "ai-infrastructure": "⚡ Infrastructure, RAG & Vector Data",
+    "developer-tools": "🛠️ Developer Tools & Coding",
+    "multimodal-ai": "🎨 Multimodal & Generative Media",
+    "generative-media": "🎨 Multimodal & Generative Media",
+    "enterprise-ai": "🚀 Industry News & Enterprise AI",
+    "open-source-ai": "🚀 Industry News & Enterprise AI",
+    "ai-safety": "🔬 Philosophy, Safety & Research",
+    "ai-research": "🔬 Philosophy, Safety & Research",
+    "ai-for-science": "🔬 Philosophy, Safety & Research",
+    "robotics": "🦾 Robotics & Hardware",
+    "human-ai-interaction": "🚀 Industry News & Enterprise AI",
+    "product-development": "🚀 Industry News & Enterprise AI",
+}
+DEFAULT_SECTION_TITLE = "📰 General AI & Tech Insights"
+
+
+def _get_resource_section_title(resource_path: Path) -> str:
+    text = read_text(resource_path)
+    from summary_metadata import _section_lines
+    topic_lines = _section_lines(text, "## Topics")
+    for line in topic_lines:
+        clean_tag = line.lstrip("-*1234567890. ").strip().lower()
+        if clean_tag in TOPIC_SECTION_TITLES:
+            return TOPIC_SECTION_TITLES[clean_tag]
+        for key, title in TOPIC_SECTION_TITLES.items():
+            if key in clean_tag or key.replace("-", " ") in clean_tag:
+                return title
+    lowered = text.lower()
+    for key, title in TOPIC_SECTION_TITLES.items():
+        if f"- {key}" in lowered or f"topic: {key}" in lowered or f"topics: {key}" in lowered:
+            return title
+    return DEFAULT_SECTION_TITLE

@@ -10,6 +10,9 @@ from utils import read_text, slugify, split_frontmatter, write_text, yaml_value
 
 
 def find_raw_transcript(item_id: str) -> Path | None:
+    pdf_match = RAW_TRANSCRIPTS / f"{item_id}.pdf"
+    if pdf_match.exists():
+        return pdf_match
     matches = sorted(RAW_TRANSCRIPTS.glob(f"*-{item_id}.md"))
     if matches:
         return matches[0]
@@ -49,6 +52,8 @@ created: {yaml_value(stamp)}
 
 
 def read_transcript_text(path: Path) -> str:
+    if str(path).lower().endswith(".pdf"):
+        return "[PDF Document Attached]"
     text = read_text(path).strip()
     if not path.name.endswith(".md") or not text.startswith("---\n"):
         return text

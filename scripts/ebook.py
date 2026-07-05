@@ -42,15 +42,13 @@ def _build_epub(markdown_path: Path) -> Path:
                 "--css",
                 str(KINDLE_CSS),
                 "--toc",
-                "--toc-depth=1",
+                "--toc-depth=2",
                 "--output",
                 str(epub_path),
             ],
             check=True,
         )
     except (subprocess.CalledProcessError, OSError) as exc:
-        # Never leave a partial EPUB behind: send_latest_to_kindle.py picks
-        # the newest output file by modification time.
         epub_path.unlink(missing_ok=True)
         print(f"Pandoc EPUB build failed ({exc}); sending Markdown instead.")
         return markdown_path
@@ -68,7 +66,15 @@ def _prepare_epub_source(markdown_path: Path) -> Path:
     if preface_end is not None:
         kept_lines = lines[:frontmatter_end]
         kept_lines.extend(["", *lines[preface_end + 1 :]])
-        transformed = "\n".join(kept_lines).strip() + "\n"
+        transformed_lines = []
+        for line in kept_lines:
+            if line.startswith("### "):
+                transformed_lines.append("# " + line[4:])
+            elif line.startswith("# ") and not line.startswith("# Appendix"):
+                transformed_lines.append("## " + line[2:])
+            else:
+                transformed_lines.append(line)
+        transformed = "\n".join(transformed_lines).strip() + "\n"
     else:
         transformed = text
     if transformed == text:
