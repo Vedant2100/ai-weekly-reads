@@ -12,7 +12,18 @@ from project_paths import INBOX, OUTPUT
 from sources import read_inbox
 
 
+def load_env():
+    env_path = Path(__file__).resolve().parent.parent / ".env"
+    if env_path.exists():
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip().strip("'\""))
+
+
 def get_token() -> str:
+    load_env()
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
     if not token:
         print("❌ Error: TELEGRAM_BOT_TOKEN environment variable not set.")

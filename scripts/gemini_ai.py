@@ -9,7 +9,18 @@ from sources import MediaItem
 from utils import read_text
 
 
+def _load_env():
+    env_path = Path(__file__).resolve().parent.parent / ".env"
+    if env_path.exists():
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip().strip("'\""))
+
+
 def _get_genai_client():
+    _load_env()
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY environment variable is required for Gemini summarization/transcription.")
@@ -21,6 +32,7 @@ def _get_genai_client():
 
 
 def can_use_gemini() -> bool:
+    _load_env()
     return bool(os.environ.get("GEMINI_API_KEY"))
 
 
