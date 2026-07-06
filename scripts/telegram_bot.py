@@ -113,22 +113,19 @@ def run_telegram_bot():
                         
                         send_message(token, chat_id, f"🚀 Generating topic-categorized AI ebook from {len(links)} link(s) using Gemini 3.1 Flash...\n⏳ Please wait ~30-60 seconds!")
                         
-                        before_epubs = set(OUTPUT.glob("*.epub"))
+                        before_files = set(OUTPUT.glob("*.*"))
                         try:
                             success = process_inbox_batch(inbox_path)
                             if success:
-                                after_epubs = set(OUTPUT.glob("*.epub")) - before_epubs
-                                if not after_epubs:
-                                    all_epubs = sorted(OUTPUT.glob("*.epub"), key=lambda p: p.stat().st_mtime, reverse=True)
-                                    newest_epub = all_epubs[0] if all_epubs else None
-                                else:
-                                    newest_epub = sorted(after_epubs, key=lambda p: p.stat().st_mtime, reverse=True)[0]
+                                after_files = set(OUTPUT.glob("*.*")) - before_files
+                                candidate_files = [p for p in (after_files if after_files else OUTPUT.glob("*.*")) if p.suffix in {".epub", ".md", ".html"}]
+                                newest_file = sorted(candidate_files, key=lambda p: p.stat().st_mtime, reverse=True)[0] if candidate_files else None
                                 
-                                if newest_epub and newest_epub.exists():
-                                    send_message(token, chat_id, "✅ Ebook compiled successfully! Uploading your EPUB file now...")
-                                    send_document(token, chat_id, newest_epub, caption=f"📘 {newest_epub.stem}\n\nTap to open in Apple Books or Kindle!")
+                                if newest_file and newest_file.exists():
+                                    send_message(token, chat_id, f"✅ Ebook compiled successfully! Uploading your {newest_file.suffix[1:].upper()} file now...")
+                                    send_document(token, chat_id, newest_file, caption=f"📘 {newest_file.stem}\n\nTap to open or read!")
                                 else:
-                                    send_message(token, chat_id, "✅ Processing finished, but could not locate the output EPUB file.")
+                                    send_message(token, chat_id, "✅ Processing finished, but could not locate the output file.")
                             else:
                                 send_message(token, chat_id, "❌ Batch processing encountered an error or no valid summaries were produced.")
                         except Exception as exc:
