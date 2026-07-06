@@ -1,1 +1,1 @@
-# Add links here (one per line). Run python3 scripts/process_inbox_batch.py to process.
+https://karpathy.github.io/2015/05/21/rnn-effectiveness/
