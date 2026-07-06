@@ -69,12 +69,12 @@ def _prepare_epub_source(markdown_path: Path) -> Path:
         transformed_lines = []
         for line in kept_lines:
             if line.startswith("### "):
-                transformed_lines.append("# " + line[4:])
-            elif line.startswith("# ") and not line.startswith("# Appendix"):
-                transformed_lines.append("## " + line[2:])
+                # Skip category headers to keep resource titles as the chapters
+                continue
             else:
                 transformed_lines.append(line)
         transformed = "\n".join(transformed_lines).strip() + "\n"
+
     else:
         transformed = text
     if transformed == text:
