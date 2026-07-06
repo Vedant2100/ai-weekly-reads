@@ -87,11 +87,16 @@ def _acquire_transcript(
             if text:
                 return text, transcription_method(settings)
 
+    if item.description:
+        return item.description, "description_fallback"
+    if item.title and item.url:
+        return f"Title: {item.title}\nURL: {item.url}", "url_fallback"
+
     return None, "unavailable"
 
 
 def _existing_text_transcript(item: MediaItem) -> str | None:
-    if item.source_type == "web_transcript" and item.description:
+    if item.source_type in ("web_transcript", "web_page", "x_post", "spotify") and item.description:
         return item.description
     if item.source_type == "podcast" and item.origin.startswith("follow-builders:") and item.description:
         return item.description

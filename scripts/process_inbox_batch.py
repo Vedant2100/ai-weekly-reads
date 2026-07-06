@@ -78,7 +78,7 @@ def process_inbox_batch(inbox_path: Path = INBOX / "links.txt") -> bool:
     kindle_path = build_kindle_file(digest_path, settings)
     print(f"📘 Categorized Ebook File written: {kindle_path}")
 
-    if settings.kindle.enabled:
+    if isinstance(settings.kindle, dict) and settings.kindle.get("enabled"):
         print("📧 Sending to Kindle...")
         try:
             maybe_send_to_kindle(kindle_path, settings)
