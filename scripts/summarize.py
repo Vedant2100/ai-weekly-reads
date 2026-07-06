@@ -78,10 +78,14 @@ def get_or_create_summary(item: MediaItem, transcript_path: Path, settings: Sett
     elif settings.summary_provider == "mistral" and os.environ.get("MISTRAL_API_KEY") and _has_real_transcript(transcript):
         summary = _mistral_summary(item, transcript, settings)
     else:
-        summary = _local_summary(item, transcript, settings)
+        note = None
+        if not _has_real_transcript(transcript):
+            note = "Source content unavailable. The raw text fetched by the scraper was empty or insufficient, so no summary could be generated."
+        summary = _local_summary(item, transcript, settings, note=note)
 
     write_text(summary_path, summary)
     return summary_path
+
 
 
 def summary_path_for(item: MediaItem) -> Path:
@@ -127,8 +131,23 @@ def _is_hollow_summary(summary: str) -> bool:
 
 
 def _has_real_transcript(transcript: str) -> bool:
-    lowered = transcript.lower()
-    return "transcript unavailable" not in lowered and "transcription failed" not in lowered
+    lowered = transcript.lower().strip()
+    if "transcript unavailable" in lowered or "transcription failed" in lowered or "404 client error" in lowered or "not found" in lowered:
+        return False
+    # If the transcript is very short, or just a link reference, it's not a real content body
+    lines = [line.strip() for line in transcript.splitlines() if line.strip()]
+    non_link_lines = [
+        l for l in lines 
+        if not l.startswith("X (Twitter) Link:") 
+        and not l.startswith("Title:") 
+        and not l.startswith("URL:") 
+        and not l.startswith("http")
+    ]
+    substantive_text = " ".join(non_link_lines).strip()
+    if len(substantive_text.split()) < 15:
+        return False
+    return True
+
 
 
 def is_placeholder_summary(summary: str) -> bool:

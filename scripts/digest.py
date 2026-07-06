@@ -165,19 +165,23 @@ def _with_resource_metadata(markdown: str, fields: dict) -> str:
         insert_at = index + 1
         while insert_at < len(lines) and not lines[insert_at].strip():
             lines.pop(insert_at)
-        metadata = []
+        
+        metadata_parts = []
         if date_value:
             label = "Published" if fields.get("published") else "Added"
-            metadata.append(f"- **{label}:** {date_value}")
+            metadata_parts.append(f"📅 **{label}:** {date_value}")
         source_kind = source_type if source_type in {"YouTube", "Podcast", "Video", "Livestream"} else "Source"
         source_value = f"[{source_label}]({url})" if url else source_label
-        metadata.append(f"- **{source_kind}:** {source_value}")
+        metadata_parts.append(f"🔗 **{source_kind}:** {source_value}")
         if speakers:
             speaker_label = "Speakers" if len(speakers) > 1 else "Speaker"
-            metadata.append(f"- **{speaker_label}:** {'; '.join(speakers)}")
-        lines[insert_at:insert_at] = ["", *metadata, ""]
+            metadata_parts.append(f"🗣️ **{speaker_label}:** {'; '.join(speakers)}")
+        
+        metadata_line = f"> " + "  |  ".join(metadata_parts)
+        lines[insert_at:insert_at] = ["", metadata_line, ""]
         break
     return "\n".join(lines)
+
 
 
 def _transcript_part(resource: str) -> str:
