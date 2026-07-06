@@ -43,11 +43,14 @@ jobs:
       - name: Process Inbox & Build Ebook
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          KINDLE_ENABLED: "true"
+          KINDLE_DELIVERY_METHOD: "smtp"
           KINDLE_EMAIL: ${{ secrets.KINDLE_EMAIL }}
-          SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
-          SMTP_PORT: ${{ secrets.SMTP_PORT }}
-          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
-          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          KINDLE_SENDER_EMAIL: ${{ secrets.KINDLE_SENDER_EMAIL }}
+          KINDLE_SMTP_HOST: ${{ secrets.KINDLE_SMTP_HOST }}
+          KINDLE_SMTP_PORT: ${{ secrets.KINDLE_SMTP_PORT }}
+          KINDLE_SMTP_USERNAME: ${{ secrets.KINDLE_SMTP_USERNAME }}
+          KINDLE_SMTP_PASSWORD: ${{ secrets.KINDLE_SMTP_PASSWORD }}
         run: |
           python scripts/process_inbox_batch.py
 
