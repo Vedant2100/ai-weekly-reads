@@ -4,7 +4,6 @@ config/settings.json
 client_secret_*.json
 config/private/
 .obsidian/
-inbox/links.txt
 __pycache__/
 *.pyc
 .*.tmp
