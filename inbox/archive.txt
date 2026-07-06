@@ -16,3 +16,24 @@ https://x.com/tanayj/status/2072766211256119475
 
 # Batch processed on 2026-07-06 00:31:02
 https://x.com/tanayj/status/2072766211256119475
+
+# Batch processed on 2026-07-06 00:37:31
+https://www.youtube.com/watch?v=uK1X_tS3c1U
+https://x.com/karpathy/status/1803875322964955375
+https://x.com/tanayj/status/2072766211256119475
+https://karpathy.github.io/2021/05/31/gpugoldrush/
+https://arxiv.org/pdf/1706.03762.pdf
+
+# Batch processed on 2026-07-06 00:43:44
+https://www.youtube.com/watch?v=n1E9IZfjGMA
+https://x.com/karpathy/status/2039805659525644595
+https://x.com/tanayj/status/2072766211256119475
+https://karpathy.github.io/2021/05/23/gpugoldrush/
+https://arxiv.org/pdf/1706.03762.pdf
+
+# Batch processed on 2026-07-06 00:44:55
+https://www.youtube.com/watch?v=zjkBMFhNj_g
+https://x.com/karpathy/status/2039805659525644595
+https://x.com/tanayj/status/2072766211256119475
+https://karpathy.github.io/2016/09/07/phd/
+https://arxiv.org/pdf/1706.03762.pdf

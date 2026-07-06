@@ -1,2 +1,1 @@
-# Queued links for processing
-https://x.com/tanayj/status/2072766211256119475
+# Add links here (one per line). Run python3 scripts/process_inbox_batch.py to process.
