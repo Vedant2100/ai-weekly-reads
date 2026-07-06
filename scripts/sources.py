@@ -184,7 +184,35 @@ def _twitter_item(url: str) -> MediaItem:
                     title = f"X Post by {author}"
                 if created:
                     published = created[:10]
-                description = text
+
+                # Twitter Articles (long-form posts) have content in article.content.blocks
+                article = data.get("article")
+                if article and isinstance(article, dict):
+                    article_title = article.get("title", "")
+                    if article_title:
+                        title = article_title
+                    content = article.get("content", {})
+                    blocks = content.get("blocks", []) if isinstance(content, dict) else []
+                    article_text_parts = []
+                    for block in blocks:
+                        block_text = block.get("text", "").strip()
+                        if block_text:
+                            block_type = block.get("type", "unstyled")
+                            if block_type.startswith("header"):
+                                article_text_parts.append(f"\n## {block_text}\n")
+                            elif block_type == "blockquote":
+                                article_text_parts.append(f"> {block_text}")
+                            elif block_type == "ordered-list-item":
+                                article_text_parts.append(f"1. {block_text}")
+                            elif block_type == "unordered-list-item":
+                                article_text_parts.append(f"- {block_text}")
+                            else:
+                                article_text_parts.append(block_text)
+                    if article_text_parts:
+                        description = "\n\n".join(article_text_parts)
+                
+                if not description:
+                    description = text
         except Exception as exc:
             print(f"Notice: fxtwitter lookup failed for {url}: {exc}")
     return MediaItem(
@@ -198,6 +226,7 @@ def _twitter_item(url: str) -> MediaItem:
         published=published,
         description=description or f"X (Twitter) Link: {url}",
     )
+
 
 
 def _youtube_item(url: str) -> MediaItem:

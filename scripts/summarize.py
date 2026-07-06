@@ -101,7 +101,29 @@ def should_refresh_summary(summary_path: Path, settings: Settings) -> bool:
         return True
     if has_key and ("Mistral summary failed" in summary or "Gemini summary failed" in summary):
         return True
+    # Detect hollow summaries where Gemini returned empty sections
+    if has_key and _is_hollow_summary(summary):
+        return True
     return False
+
+
+def _is_hollow_summary(summary: str) -> bool:
+    """Check if a summary has the right headings but no actual content in them."""
+    required = ["## One-Sentence Takeaway", "## Short Summary", "## Main Ideas"]
+    for heading in required:
+        idx = summary.find(heading)
+        if idx == -1:
+            continue
+        # Get text between this heading and the next heading
+        after = summary[idx + len(heading):]
+        next_heading = after.find("\n## ")
+        section = after[:next_heading] if next_heading != -1 else after
+        # Strip whitespace and check if the section is empty
+        section_text = section.strip()
+        if not section_text:
+            return True
+    return False
+
 
 
 def _has_real_transcript(transcript: str) -> bool:
