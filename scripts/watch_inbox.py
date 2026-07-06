@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import time
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from process_inbox_batch import process_inbox_batch
 from project_paths import INBOX
