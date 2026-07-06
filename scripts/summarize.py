@@ -299,22 +299,39 @@ def _prompt_path_for(item: MediaItem) -> Path:
 
 
 def _local_summary(item: MediaItem, transcript: str, settings: Settings, note: str | None = None) -> str:
+    # If the transcript was unavailable or empty, write a clean, brief notice
+    # rather than a giant empty template
+    if note and "unavailable" in note.lower():
+        return f"""# {item.title}
+
+Source: {item.source_type}
+Original link: {item.url}
+
+## Summary Unavailable
+
+{note}
+"""
+
+    # If it is a real fallback (e.g. API keys are missing but transcript exists),
+    # show a cleaner excerpt-based page without the placeholder text
     words = transcript.split()
-    excerpt = " ".join(words[:350])
-    if len(words) > 350:
+    excerpt = " ".join(words[:250])
+    if len(words) > 250:
         excerpt += "..."
-    if note:
-        overview = note
-    else:
-        overview = "AI summary is not enabled yet. Set GEMINI_API_KEY to generate structured summaries with Google Gemini."
-    return SUMMARY_TEMPLATE.format(
-        title=item.title,
-        source_type=item.source_type,
-        url=item.url,
-        overview=overview,
-        main_ideas=f"- Transcript excerpt: {excerpt or 'No transcript text available.'}",
-        qa="- Not generated in local fallback mode.",
-        details="- Not generated in local fallback mode.",
-        takeaways="- Not generated in local fallback mode.",
-        priority="Medium, pending AI summary.",
-    )
+    
+    overview = note or "AI summary is not enabled. Set GEMINI_API_KEY to generate structured summaries with Google Gemini."
+    
+    return f"""# {item.title}
+
+Source: {item.source_type}
+Original link: {item.url}
+
+## One-Paragraph Summary
+
+{overview}
+
+## Content Excerpt
+
+{excerpt or "No text content available."}
+"""
+
