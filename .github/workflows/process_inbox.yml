@@ -1,3 +1,5 @@
+
+
 name: Process Inbox & Generate Ebook
 
 on:
@@ -6,8 +8,8 @@ on:
       - 'inbox/links.txt'
   workflow_dispatch:
   schedule:
-    # Run automatically every Sunday at 8:00 AM UTC
-    - cron: "0 8 * * 0"
+    # Run automatically every 3 days at 8:00 AM UTC
+    - cron: "0 8 */3 * *"
 
 permissions:
   contents: write
@@ -55,6 +57,26 @@ jobs:
           name: ai-weekly-reads-ebook
           path: output/*.epub
           if-no-files-found: ignore
+
+      - name: Send Ebook to Telegram
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
+            EPUB_FILE=$(ls -t output/*.epub 2>/dev/null | head -n 1)
+            if [ -n "$EPUB_FILE" ] && [ -f "$EPUB_FILE" ]; then
+              echo "📤 Sending $EPUB_FILE to Telegram chat $TELEGRAM_CHAT_ID..."
+              curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
+                -F "chat_id=${TELEGRAM_CHAT_ID}" \
+                -F "caption=📘 Auto-generated AI Reads Ebook! Tap to open." \
+                -F "document=@${EPUB_FILE}"
+            else
+              echo "No EPUB file found to send."
+            fi
+          else
+            echo "Telegram secrets not set; skipping Telegram delivery."
+          fi
 
       - name: Commit and push generated notes & ebook
         run: |
