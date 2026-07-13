@@ -45,7 +45,7 @@ Week of 2026-07-13
 
 ## One-Paragraph Summary
 
-Gemini summary failed: 404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-3.1-flash is not found for API version v1beta, or is not supported for generateContent. Call ModelService.ListModels to see the list of available models and their supported methods.', 'status': 'NOT_FOUND'}}
+Rate limit issue: The Gemini API quota was exceeded.
 
 ## Content Excerpt
 
@@ -63,7 +63,7 @@ Low – Mostly contextual, repetitive, or niche relative to the rest of the read
 
 ## One-Paragraph Summary
 
-Gemini summary failed: 404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-3.1-flash is not found for API version v1beta, or is not supported for generateContent. Call ModelService.ListModels to see the list of available models and their supported methods.', 'status': 'NOT_FOUND'}}
+Rate limit issue: The Gemini API quota was exceeded.
 
 ## Content Excerpt
 
@@ -81,7 +81,7 @@ Low – Mostly contextual, repetitive, or niche relative to the rest of the read
 
 ## One-Paragraph Summary
 
-Gemini summary failed: 404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-3.1-flash is not found for API version v1beta, or is not supported for generateContent. Call ModelService.ListModels to see the list of available models and their supported methods.', 'status': 'NOT_FOUND'}}
+Rate limit issue: The Gemini API quota was exceeded.
 
 ## Content Excerpt
 
@@ -99,7 +99,7 @@ Low – Mostly contextual, repetitive, or niche relative to the rest of the read
 
 ## One-Paragraph Summary
 
-Gemini summary failed: 404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-3.1-flash is not found for API version v1beta, or is not supported for generateContent. Call ModelService.ListModels to see the list of available models and their supported methods.', 'status': 'NOT_FOUND'}}
+Rate limit issue: The Gemini API quota was exceeded.
 
 ## Content Excerpt
 
@@ -117,7 +117,7 @@ Low – Mostly contextual, repetitive, or niche relative to the rest of the read
 
 ## One-Paragraph Summary
 
-Gemini summary failed: 404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-3.1-flash is not found for API version v1beta, or is not supported for generateContent. Call ModelService.ListModels to see the list of available models and their supported methods.', 'status': 'NOT_FOUND'}}
+Rate limit issue: The Gemini API quota was exceeded.
 
 ## Content Excerpt
 
@@ -135,7 +135,7 @@ Low – Mostly contextual, repetitive, or niche relative to the rest of the read
 
 ## One-Paragraph Summary
 
-Gemini summary failed: 404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-3.1-flash is not found for API version v1beta, or is not supported for generateContent. Call ModelService.ListModels to see the list of available models and their supported methods.', 'status': 'NOT_FOUND'}}
+Rate limit issue: The Gemini API quota was exceeded.
 
 ## Content Excerpt
 
@@ -151,17 +151,56 @@ Low – Mostly contextual, repetitive, or niche relative to the rest of the read
 
 > 📅 **Published:** Wed Jul 08  |  🔗 **Source:** [Sergio Paniego](https://x.com/i/status/2074863503312044499)
 
-## One-Paragraph Summary
+## One-Sentence Takeaway
 
-Gemini summary failed: 404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-3.1-flash is not found for API version v1beta, or is not supported for generateContent. Call ModelService.ListModels to see the list of available models and their supported methods.', 'status': 'NOT_FOUND'}}
+Distillation has become a versatile and essential post-training technique for frontier models in 2026, enabling efficient compression, merging of specialized RL experts, and self-improvement for continual learning.
 
-## Content Excerpt
+## Short Summary
 
-> This article is complementary material for Class 2: Distillation of the Training an Agent series Ben and I are doing, where we teach the post-training techniques behind a coding agent, step by step. Class 1 covered SFT on traces.It also pairs with the short history of distillation we published before the class, if you want the background first. Distillation is widely used in the post-training recipes of 2026's frontier models. The three stages we discussed in the live session (off-policy, on-policy and self-distillation) map directly onto how labs use it in real life. ## A large teacher and a smaller student The original use is still everywhere! Take a large, expensive teacher and train a smaller student to match it. Gemma 3's tech report tells us that its post-training "relies on an improved version of knowledge distillation from a large IT teacher" (IT = instruction-tuned). The brand-new Gemma 4 tech report describes a similar post-training recipe, so we can infer that some distillation is also involved. DeepSeek-R1-Distill is also a case of this, and we already covered it in the brief history article: reasoning traces from R1 were distilled into compact Qwen and Llama students via plain fine-tuning (SFT) on the teacher's text, the sequence-level flavor. These are the two flavors of the off-policy stage we covered in the class: match the teacher's next-token distribution (soft labels, white-box) or train directly on the teacher's generated text (hard labels, works black-box). R1-Distill is the second one. Same teacher-student idea, different...
+Distillation, a technique where a smaller "student" model learns from a larger or more specialized "teacher" model, is now a cornerstone of post-training recipes for advanced AI models. It addresses key challenges in model development, such as reducing model size, integrating diverse capabilities, and maintaining performance during iterative training. The article outlines three primary applications: the classic use of a large teacher training a smaller student, the modern approach of merging multiple specialized RL experts into a single unified model, and self-distillation where a model learns from a better version of itself.
+
+This widespread adoption by leading labs like Google, DeepSeek, NVIDIA, and Cursor highlights distillation's practical advantages over traditional reinforcement learning (RL) methods. Distillation provides dense, token-level feedback, allowing for faster convergence and more precise behavior shaping compared to RL's single, sparse reward signal. Its ability to efficiently transfer knowledge, specialize models, and facilitate continual learning makes it a critical component for developing robust, performant, and adaptable AI systems.
+
+## Main Ideas
+
+*   **Off-Policy Distillation for Model Compression:** The traditional use of distillation involves a large, instruction-tuned (IT) teacher model training a smaller student model, often via fine-tuning on the teacher's generated text (hard labels) or matching its next-token distribution (soft labels).
+*   **On-Policy Distillation for Merging RL Experts:** A newer, widely adopted method involves training separate RL experts for different domains (e.g., math, code) and then distilling their combined knowledge into a single student model. These "teachers" are typically specialized checkpoints of the same base model, not necessarily larger.
+*   **Distillation's Efficiency Over RL:** Labs favor distillation because it provides dense, token-level feedback to the student, allowing for much faster and more precise convergence on desired behaviors compared to the sparse, attempt-level reward signals of reinforcement learning.
+*   **Self-Distillation for Behavior Shaping and Continual Learning:** Models can act as their own teachers. This includes injecting hints into the context to guide a model, which then learns to produce the desired behavior without the hint, or distilling from an earlier checkpoint to restore lost capabilities after fine-tuning on new data.
+*   **Versatility Across Training Stages:** Distillation is applied not only across different domains but also across sequential RL training phases to recover capabilities that might degrade during subsequent stages.
+
+## Questions And Answers
+
+No distinct Q&A section.
+
+## Notable Details
+
+*   Gemma 3 and Gemma 4's post-training recipes rely on improved knowledge distillation from large instruction-tuned teachers.
+*   DeepSeek-R1-Distill used reasoning traces from a large R1 model to train compact Qwen and Llama students via sequence-level fine-tuning (hard labels).
+*   DeepSeek-V4's pipeline trains a unified model through on-policy distillation, optimizing reverse KL loss against specialized domain experts (SFT then GRPO).
+*   MiMo-V2-Flash introduced Multi-Teacher On-Policy Distillation (MOPD), where multiple domain teachers provide dense, token-level signals.
+*   Qwen3's report claims distillation achieved better results at roughly 1/10 the GPU hours compared to RL for similar outcomes.
+*   Cursor's Composer 2.5 uses self-distillation by having a hint-conditioned version of the model act as a teacher for its unhinted self, enabling behavior without explicit prompts at inference.
+
+## Actionable Takeaways
+
+*   **Investigate Distillation for Model Efficiency:** Consider distillation as a primary strategy for compressing large models or creating smaller, more efficient versions without significant performance loss.
+*   **Adopt Multi-Teacher Distillation for Multi-Domain Models:** For models requiring expertise across diverse domains, explore training specialized RL experts and then merging them into a single model using on-policy distillation.
+*   **Leverage Self-Distillation for Continual Learning:** Implement self-distillation techniques to help models retain prior knowledge while learning new skills, addressing the challenge of catastrophic forgetting in continual learning scenarios.
+*   **Prioritize Token-Level Feedback:** Recognize that distillation's ability to provide dense, token-level feedback offers a significant advantage in training efficiency and precision over sparse reward signals in traditional RL.
+
+## People, Companies, Tools, And Links Mentioned
+
+*   **People:** Ben, Sasha Rush (@srush_nlp), Dwarkesh Patel, Rafa Nadal
+*   **Companies:** Google, DeepSeek, NVIDIA, Thinking Machines, Cursor
+*   **Models/Products:** Gemma 3, Gemma 4, DeepSeek-R1-Distill, Qwen, Llama, DeepSeek-V4, MiMo-V2-Flash, GLM-5, Nemotron 3 Ultra, Qwen3, Cursor's Composer 2.5
+*   **Tools:** TRL
+*   **Links:**
+    *   Distillation in 2026 (so far): which frontier models use it and how: [https://x.com/i/status/2074863503312044499](https://x.com/i/status/2074863503312044499)
 
 ## Reading Priority
 
-Low – Mostly contextual, repetitive, or niche relative to the rest of the reading queue.
+Medium – This article provides a highly concrete and timely overview of how knowledge distillation is being practically applied by leading AI labs in 2026, detailing specific mechanisms and models.
 
 ***
 
@@ -171,7 +210,7 @@ Low – Mostly contextual, repetitive, or niche relative to the rest of the read
 
 ## One-Paragraph Summary
 
-Gemini summary failed: 404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-3.1-flash is not found for API version v1beta, or is not supported for generateContent. Call ModelService.ListModels to see the list of available models and their supported methods.', 'status': 'NOT_FOUND'}}
+Rate limit issue: The Gemini API quota was exceeded.
 
 ## Content Excerpt
 
@@ -189,7 +228,7 @@ Low – Mostly contextual, repetitive, or niche relative to the rest of the read
 
 ## One-Paragraph Summary
 
-Gemini summary failed: 404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-3.1-flash is not found for API version v1beta, or is not supported for generateContent. Call ModelService.ListModels to see the list of available models and their supported methods.', 'status': 'NOT_FOUND'}}
+Rate limit issue: The Gemini API quota was exceeded.
 
 ## Content Excerpt
 
@@ -209,10 +248,6 @@ Low – Mostly contextual, repetitive, or niche relative to the rest of the read
 
 Source content unavailable. The raw text fetched by the scraper was empty or insufficient, so no summary could be generated.
 
-## Reading Priority
-
-Low – Mostly contextual, repetitive, or niche relative to the rest of the reading queue.
-
 ***
 
 # The Art of Scaling Reinforcement Learning for LLMs | Sean Bell, Resolve AI Labs
@@ -222,10 +257,6 @@ Low – Mostly contextual, repetitive, or niche relative to the rest of the read
 ## Summary Unavailable
 
 Source content unavailable. The raw text fetched by the scraper was empty or insufficient, so no summary could be generated.
-
-## Reading Priority
-
-Low – Mostly contextual, repetitive, or niche relative to the rest of the reading queue.
 
 ***
 
@@ -237,10 +268,6 @@ Low – Mostly contextual, repetitive, or niche relative to the rest of the read
 
 Source content unavailable. The raw text fetched by the scraper was empty or insufficient, so no summary could be generated.
 
-## Reading Priority
-
-Low – Mostly contextual, repetitive, or niche relative to the rest of the reading queue.
-
 ***
 
 # Be impatient | benkuhn.net
@@ -249,7 +276,7 @@ Low – Mostly contextual, repetitive, or niche relative to the rest of the read
 
 ## One-Paragraph Summary
 
-Gemini summary failed: 404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-3.1-flash is not found for API version v1beta, or is not supported for generateContent. Call ModelService.ListModels to see the list of available models and their supported methods.', 'status': 'NOT_FOUND'}}
+Rate limit issue: The Gemini API quota was exceeded.
 
 ## Content Excerpt
 
@@ -269,10 +296,6 @@ Low – Mostly contextual, repetitive, or niche relative to the rest of the read
 
 Source content unavailable. The raw text fetched by the scraper was empty or insufficient, so no summary could be generated.
 
-## Reading Priority
-
-Low – Mostly contextual, repetitive, or niche relative to the rest of the reading queue.
-
 ***
 
 # Hot takes on AI memory
@@ -281,7 +304,7 @@ Low – Mostly contextual, repetitive, or niche relative to the rest of the read
 
 ## One-Paragraph Summary
 
-Gemini summary failed: 404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-3.1-flash is not found for API version v1beta, or is not supported for generateContent. Call ModelService.ListModels to see the list of available models and their supported methods.', 'status': 'NOT_FOUND'}}
+Rate limit issue: The Gemini API quota was exceeded.
 
 ## Content Excerpt
 
