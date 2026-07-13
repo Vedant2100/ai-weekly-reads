@@ -68,6 +68,8 @@ DEFAULT_REASONS = {
 
 
 def normalize_reading_priority(markdown: str, title: str = "") -> str:
+    if "Summary Unavailable" in markdown:
+        return markdown
     lines = markdown.splitlines()
     start, end = _section_bounds(lines, PRIORITY_HEADING)
     label, reason = _extract_priority(lines, start, end)

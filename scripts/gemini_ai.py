@@ -42,34 +42,64 @@ def gemini_summary(item: MediaItem, transcript: str, settings: Settings) -> str:
     try:
         client = _get_genai_client()
         prompt = _summary_prompt(item, transcript)
-        model = settings.summary_model if settings.summary_provider == "gemini" else "gemini-2.5-flash"
         
-        backoffs = [0, 10, 30, 60]
+        requested_model = settings.summary_model if settings.summary_provider == "gemini" else "gemini-2.5-pro"
+        models_to_try = [requested_model, "gemini-2.5-pro", "gemini-1.5-flash"]
+        seen = set()
+        candidate_models = []
+        for m in models_to_try:
+            if m not in seen:
+                seen.add(m)
+                candidate_models.append(m)
+
+        last_error = None
         response = None
-        for delay in backoffs:
-            if delay:
-                print(f"Gemini rate limit/backoff: waiting {delay}s before retrying {item.title}")
-                time.sleep(delay)
-            try:
-                response = client.models.generate_content(
-                    model=model,
-                    contents=[
-                        "You create precise, readable Markdown knowledge-base notes from long media transcripts or articles.",
-                        prompt,
-                    ],
-                    config={"temperature": 0.2},
-                )
-                if response and response.text:
-                    break
-            except Exception as exc:
-                if _should_retry(exc):
-                    continue
-                raise
-        if not response or not response.text:
-            raise RuntimeError("Gemini returned empty response.")
-        return format_ai_summary(item, response.text)
+        for model in candidate_models:
+            backoffs = [0, 5, 15, 30]
+            success = False
+            for delay in backoffs:
+                if delay:
+                    print(f"Gemini backoff: waiting {delay}s before retrying {item.title}")
+                    time.sleep(delay)
+                try:
+                    response = client.models.generate_content(
+                        model=model,
+                        contents=[
+                            "You create precise, readable Markdown knowledge-base notes from long media transcripts or articles.",
+                            prompt,
+                        ],
+                        config={"temperature": 0.2},
+                    )
+                    if response and response.text:
+                        success = True
+                        break
+                except Exception as exc:
+                    last_error = exc
+                    err_msg = str(exc).lower()
+                    if "not found" in err_msg or "not supported" in err_msg or "404" in err_msg:
+                        print(f"Model '{model}' not found/supported. Trying next fallback...")
+                        break
+                    if _should_retry(exc):
+                        continue
+                    raise
+            
+            if success and response and response.text:
+                return format_ai_summary(item, response.text)
+        
+        if last_error:
+            raise last_error
+        raise RuntimeError("Gemini returned empty response for all models.")
     except Exception as exc:
-        return _local_summary(item, transcript, settings, note=f"Gemini summary failed: {exc}")
+        err_str = str(exc)
+        if "not found" in err_str.lower():
+            friendly_note = "Model configuration issue: The requested model was not found or is not supported."
+        elif "api_key" in err_str.lower() or "api key" in err_str.lower() or "credentials" in err_str.lower():
+            friendly_note = "Authentication issue: The provided GEMINI_API_KEY is invalid or missing."
+        elif "quota" in err_str.lower() or "429" in err_str.lower() or "limit" in err_str.lower():
+            friendly_note = "Rate limit issue: The Gemini API quota was exceeded."
+        else:
+            friendly_note = f"Gemini API issue: Summarization failed due to an unexpected error."
+        return _local_summary(item, transcript, settings, note=friendly_note)
 
 
 def summarize_pdf_gemini(item: MediaItem, pdf_path: Path, settings: Settings) -> str:
@@ -82,41 +112,71 @@ def summarize_pdf_gemini(item: MediaItem, pdf_path: Path, settings: Settings) ->
         print(f"Uploading PDF to Gemini File API: {pdf_path.name}")
         uploaded_file = client.files.upload(file=pdf_path)
         try:
-            model = settings.summary_model if settings.summary_provider == "gemini" else "gemini-2.5-flash"
+            requested_model = settings.summary_model if settings.summary_provider == "gemini" else "gemini-2.5-pro"
+            models_to_try = [requested_model, "gemini-2.5-pro", "gemini-1.5-flash"]
+            seen = set()
+            candidate_models = []
+            for m in models_to_try:
+                if m not in seen:
+                    seen.add(m)
+                    candidate_models.append(m)
+
             prompt = _summary_prompt(item, f"[Full PDF Document: {pdf_path.name}]")
             
-            backoffs = [0, 10, 30, 60]
+            last_error = None
             response = None
-            for delay in backoffs:
-                if delay:
-                    print(f"Gemini backoff: waiting {delay}s before retrying {item.title}")
-                    time.sleep(delay)
-                try:
-                    response = client.models.generate_content(
-                        model=model,
-                        contents=[
-                            "You create precise, readable Markdown knowledge-base notes from research papers, reports, or PDF documents.",
-                            uploaded_file,
-                            prompt,
-                        ],
-                        config={"temperature": 0.2},
-                    )
-                    if response and response.text:
-                        break
-                except Exception as exc:
-                    if _should_retry(exc):
-                        continue
-                    raise
-            if not response or not response.text:
-                raise RuntimeError("Gemini returned empty response for PDF.")
-            return format_ai_summary(item, response.text)
+            for model in candidate_models:
+                backoffs = [0, 5, 15, 30]
+                success = False
+                for delay in backoffs:
+                    if delay:
+                        print(f"Gemini backoff: waiting {delay}s before retrying {item.title}")
+                        time.sleep(delay)
+                    try:
+                        response = client.models.generate_content(
+                            model=model,
+                            contents=[
+                                "You create precise, readable Markdown knowledge-base notes from research papers, reports, or PDF documents.",
+                                uploaded_file,
+                                prompt,
+                            ],
+                            config={"temperature": 0.2},
+                        )
+                        if response and response.text:
+                            success = True
+                            break
+                    except Exception as exc:
+                        last_error = exc
+                        err_msg = str(exc).lower()
+                        if "not found" in err_msg or "not supported" in err_msg or "404" in err_msg:
+                            print(f"Model '{model}' not found/supported for PDF. Trying next fallback...")
+                            break
+                        if _should_retry(exc):
+                            continue
+                        raise
+                
+                if success and response and response.text:
+                    return format_ai_summary(item, response.text)
+            
+            if last_error:
+                raise last_error
+            raise RuntimeError("Gemini PDF summary returned empty response for all models.")
         finally:
             try:
                 client.files.delete(name=uploaded_file.name)
             except Exception as exc:
                 print(f"Notice: Failed to delete temporary uploaded PDF from Gemini: {exc}")
     except Exception as exc:
-        return _local_summary(item, f"PDF upload/summarization failed: {exc}", settings, note=f"Gemini PDF summary failed: {exc}")
+        err_str = str(exc)
+        if "not found" in err_str.lower():
+            friendly_note = "Model configuration issue: The requested model was not found or is not supported."
+        elif "api_key" in err_str.lower() or "api key" in err_str.lower() or "credentials" in err_str.lower():
+            friendly_note = "Authentication issue: The provided GEMINI_API_KEY is invalid or missing."
+        elif "quota" in err_str.lower() or "429" in err_str.lower() or "limit" in err_str.lower():
+            friendly_note = "Rate limit issue: The Gemini API quota was exceeded."
+        else:
+            friendly_note = f"Gemini API issue: Summarization failed due to an unexpected error."
+        return _local_summary(item, f"PDF upload/summarization failed: {friendly_note}", settings, note=friendly_note)
 
 
 def transcribe_media_file_gemini(media_path: Path | None, settings: Settings) -> str | None:
@@ -127,29 +187,47 @@ def transcribe_media_file_gemini(media_path: Path | None, settings: Settings) ->
         print(f"Uploading audio/video file to Gemini for transcription: {media_path.name}")
         uploaded_file = client.files.upload(file=media_path)
         try:
-            model = settings.transcription_model if settings.transcription_provider == "gemini" else "gemini-2.5-flash"
-            backoffs = [0, 15, 45, 90]
-            for delay in backoffs:
-                if delay:
-                    print(f"Gemini transcription backoff: waiting {delay}s")
-                    time.sleep(delay)
-                try:
-                    response = client.models.generate_content(
-                        model=model,
-                        contents=[
-                            uploaded_file,
-                            "Please generate a verbatim, complete, and accurate text transcript of the speech in this audio/video recording. Do not summarize or skip sections. Write out the exact spoken words.",
-                        ],
-                        config={"temperature": 0.1},
-                    )
-                    if response and response.text:
-                        return response.text.strip()
-                except Exception as exc:
-                    if _should_retry(exc):
-                        continue
-                    print(f"Gemini transcription failed for {media_path.name}: {exc}")
-                    return None
-            print(f"Gemini transcription rate-limited for {media_path.name} after retries")
+            requested_model = settings.transcription_model if settings.transcription_provider == "gemini" else "gemini-2.5-pro"
+            models_to_try = [requested_model, "gemini-2.5-pro", "gemini-1.5-flash"]
+            seen = set()
+            candidate_models = []
+            for m in models_to_try:
+                if m not in seen:
+                    seen.add(m)
+                    candidate_models.append(m)
+
+            for model in candidate_models:
+                backoffs = [0, 10, 30, 60]
+                success = False
+                response = None
+                for delay in backoffs:
+                    if delay:
+                        print(f"Gemini transcription backoff: waiting {delay}s")
+                        time.sleep(delay)
+                    try:
+                        response = client.models.generate_content(
+                            model=model,
+                            contents=[
+                                uploaded_file,
+                                "Please generate a verbatim, complete, and accurate text transcript of the speech in this audio/video recording. Do not summarize or skip sections. Write out the exact spoken words.",
+                            ],
+                            config={"temperature": 0.1},
+                        )
+                        if response and response.text:
+                            success = True
+                            break
+                    except Exception as exc:
+                        err_msg = str(exc).lower()
+                        if "not found" in err_msg or "not supported" in err_msg or "404" in err_msg:
+                            print(f"Model '{model}' not found/supported for transcription. Trying next fallback...")
+                            break
+                        if _should_retry(exc):
+                            continue
+                        print(f"Gemini transcription failed for {media_path.name} on model {model}: {exc}")
+                        break
+                
+                if success and response and response.text:
+                    return response.text.strip()
             return None
         finally:
             try:

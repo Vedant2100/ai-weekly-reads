@@ -97,13 +97,7 @@ def should_refresh_summary(summary_path: Path, settings: Settings) -> bool:
         return True
     summary = read_text(summary_path)
     has_key = bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("MISTRAL_API_KEY"))
-    if has_key and "AI summary is not enabled yet" in summary:
-        return True
-    if has_key and "Not generated in local fallback mode" in summary:
-        return True
-    if has_key and "Transcript excerpt:" in summary:
-        return True
-    if has_key and ("Mistral summary failed" in summary or "Gemini summary failed" in summary):
+    if has_key and is_placeholder_summary(summary):
         return True
     # Detect hollow summaries where Gemini returned empty sections
     if has_key and _is_hollow_summary(summary):
@@ -157,6 +151,11 @@ def is_placeholder_summary(summary: str) -> bool:
         or "Mistral summary failed" in summary
         or "Gemini summary failed" in summary
         or "AI summary failed" in summary
+        or "Model configuration issue:" in summary
+        or "Authentication issue:" in summary
+        or "Rate limit issue:" in summary
+        or "Gemini API issue:" in summary
+        or "Summary Unavailable" in summary
     )
 
 

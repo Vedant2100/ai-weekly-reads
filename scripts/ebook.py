@@ -43,6 +43,8 @@ def _build_epub(markdown_path: Path) -> Path:
                 str(KINDLE_CSS),
                 "--toc",
                 "--toc-depth=2",
+                "--metadata",
+                "toc-title=Contents",
                 "--output",
                 str(epub_path),
             ],
