@@ -44,7 +44,7 @@ def gemini_summary(item: MediaItem, transcript: str, settings: Settings) -> str:
         prompt = _summary_prompt(item, transcript)
         
         requested_model = settings.summary_model if settings.summary_provider == "gemini" else "gemini-2.5-pro"
-        models_to_try = [requested_model, "gemini-2.5-pro", "gemini-1.5-flash"]
+        models_to_try = [requested_model, settings.summary_fallback_model, "gemini-2.5-flash"]
         seen = set()
         candidate_models = []
         for m in models_to_try:
@@ -113,7 +113,7 @@ def summarize_pdf_gemini(item: MediaItem, pdf_path: Path, settings: Settings) ->
         uploaded_file = client.files.upload(file=pdf_path)
         try:
             requested_model = settings.summary_model if settings.summary_provider == "gemini" else "gemini-2.5-pro"
-            models_to_try = [requested_model, "gemini-2.5-pro", "gemini-1.5-flash"]
+            models_to_try = [requested_model, settings.summary_fallback_model, "gemini-2.5-flash"]
             seen = set()
             candidate_models = []
             for m in models_to_try:

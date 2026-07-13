@@ -3,9 +3,6 @@
 name: Process Inbox & Generate Ebook
 
 on:
-  push:
-    paths:
-      - 'inbox/links.txt'
   workflow_dispatch:
   schedule:
     # Run automatically every day at 10:00 AM PT (17:00 UTC)

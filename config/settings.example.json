@@ -3,7 +3,7 @@
   "timezone": "America/Chicago",
   "summary_provider": "gemini",
   "summary_model": "gemini-2.5-pro",
-  "summary_fallback_model": "gemini-3.1-pro",
+  "summary_fallback_model": "gemini-2.5-flash",
   "summary_mode": "direct",
   "transcription_provider": "gemini",
   "transcription_model": "gemini-2.5-pro",
