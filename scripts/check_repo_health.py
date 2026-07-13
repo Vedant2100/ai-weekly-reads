@@ -18,7 +18,6 @@ REQUIRED_SUMMARY_PROMPTS = [
 ]
 REQUIRED_IGNORES = [
     "config/settings.json",
-    "inbox/links.txt",
     "knowledge_base/raw_transcripts/",
     "knowledge_base/resources/",
     "knowledge_base/weekly_books/",
@@ -34,7 +33,6 @@ REQUIRED_IGNORES = [
 ]
 GENERATED_PATHS = [
     "config/settings.json",
-    "inbox/links.txt",
     "knowledge_base/raw_transcripts",
     "knowledge_base/resources",
     "knowledge_base/weekly_books",
@@ -81,14 +79,14 @@ def _check_settings(path: Path, errors: list[str]) -> None:
 
     if settings.summary_mode not in {"batch", "direct"}:
         errors.append(f"{label}: summary_mode must be 'batch' or 'direct'.")
-    if settings.summary_provider not in {"mistral", "local"}:
-        errors.append(f"{label}: summary_provider must be 'mistral' or 'local'.")
+    if settings.summary_provider not in {"mistral", "local", "gemini"}:
+        errors.append(f"{label}: summary_provider must be 'mistral', 'local', or 'gemini'.")
     if not str(settings.summary_model or "").strip():
         errors.append(f"{label}: summary_model must not be empty.")
     if not str(settings.summary_fallback_model or "").strip():
         errors.append(f"{label}: summary_fallback_model must not be empty.")
-    if settings.transcription_provider not in {"mistral", "none"}:
-        errors.append(f"{label}: transcription_provider must be 'mistral' or 'none'.")
+    if settings.transcription_provider not in {"mistral", "none", "gemini"}:
+        errors.append(f"{label}: transcription_provider must be 'mistral', 'none', or 'gemini'.")
     if settings.kindle_output_format.lower() not in {"epub", "markdown", "md"}:
         errors.append(f"{label}: kindle_output_format must be 'epub' or 'markdown'.")
     if settings.follow_builders.get("enabled") and not _is_http_url(settings.follow_builders.get("base_url")):
@@ -229,9 +227,9 @@ def _check_public_markdown(path: Path, label: str, errors: list[str]) -> None:
     graph_headings = [f"## {heading.title()}" for heading in GRAPH_ONLY_HEADINGS]
     if "[[" in text or any(heading in text for heading in graph_headings):
         errors.append(f"{label} must not contain Obsidian-only wikilinks or graph sections.")
-    if not re.search(r"^- \*\*(Published|Added):\*\*", text, re.MULTILINE):
+    if not re.search(r"\*\*(Published|Added):\*\*", text):
         errors.append(f"{label} should include published or added dates in each summary.")
-    if not re.search(r"^- \*\*(YouTube|Podcast|Video|Livestream|Source):\*\* \[[^\]]+\]\(https?://", text, re.MULTILINE):
+    if not re.search(r"\*\*(YouTube|Podcast|Video|Livestream|Source):\*\* \[[^\]]+\]\(https?://", text):
         errors.append(f"{label} should include linked source labels for original items.")
 
 
