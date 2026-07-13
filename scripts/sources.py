@@ -255,6 +255,20 @@ def _youtube_item(url: str) -> MediaItem:
             published = f"{upload_date[:4]}-{upload_date[4:6]}-{upload_date[6:]}"
     except Exception as exc:
         print(f"Could not fetch YouTube metadata for {url}: {exc}")
+
+    # Fallback to official oEmbed API if metadata failed or channel/title is missing
+    if not source_name or title == url:
+        try:
+            import requests
+            oembed_url = f"https://www.youtube.com/oembed?url={url}&format=json"
+            r = requests.get(oembed_url, timeout=10)
+            if r.status_code == 200:
+                data = r.json()
+                title = data.get("title") or title
+                source_name = data.get("author_name") or source_name
+        except Exception as oexc:
+            print(f"YouTube oEmbed fallback failed: {oexc}")
+
     return MediaItem(
         id=stable_id(url),
         url=url,
@@ -265,6 +279,7 @@ def _youtube_item(url: str) -> MediaItem:
         published=published,
         description=description,
     )
+
 
 
 def _entry_audio_url(entry: dict) -> str | None:
