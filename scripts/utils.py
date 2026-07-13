@@ -214,3 +214,58 @@ def ytdlp_js_runtimes() -> dict[str, dict[str, str]]:
     if not node_path:
         return {}
     return {"node": {"path": node_path}}
+
+
+def _ensure_cookie_file_from_env() -> Path | None:
+    raw_cookies = os.environ.get("YTDLP_COOKIES_TXT", "").strip()
+    if not raw_cookies:
+        return None
+    out_path = Path(__file__).resolve().parent.parent / "config" / "private" / "youtube_cookies.txt"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    if not out_path.exists() or out_path.read_text(encoding="utf-8") != raw_cookies:
+        out_path.write_text(raw_cookies + "\n", encoding="utf-8")
+    return out_path
+
+
+def ytdlp_cookie_args() -> list[str]:
+    load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+    env_cookie_file = _ensure_cookie_file_from_env()
+    if env_cookie_file and env_cookie_file.exists():
+        return ["--cookies", str(env_cookie_file)]
+    browser = os.environ.get("YTDLP_COOKIES_FROM_BROWSER", "").strip()
+    if browser:
+        return ["--cookies-from-browser", browser]
+    cookie_file = os.environ.get("YTDLP_COOKIES", "").strip()
+    if cookie_file and Path(cookie_file).exists():
+        return ["--cookies", cookie_file]
+    for candidate in (
+        Path(__file__).resolve().parent.parent / "config" / "private" / "youtube_cookies.txt",
+        Path(__file__).resolve().parent.parent / "config" / "cookies.txt",
+        Path(__file__).resolve().parent.parent / "cookies.txt",
+    ):
+        if candidate.exists():
+            return ["--cookies", str(candidate)]
+    return []
+
+
+def ytdlp_cookie_options() -> dict[str, Any]:
+    load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+    env_cookie_file = _ensure_cookie_file_from_env()
+    if env_cookie_file and env_cookie_file.exists():
+        return {"cookiefile": str(env_cookie_file)}
+    browser = os.environ.get("YTDLP_COOKIES_FROM_BROWSER", "").strip()
+    if browser:
+        return {"cookiesfrombrowser": (browser,)}
+    cookie_file = os.environ.get("YTDLP_COOKIES", "").strip()
+    if cookie_file and Path(cookie_file).exists():
+        return {"cookiefile": cookie_file}
+    for candidate in (
+        Path(__file__).resolve().parent.parent / "config" / "private" / "youtube_cookies.txt",
+        Path(__file__).resolve().parent.parent / "config" / "cookies.txt",
+        Path(__file__).resolve().parent.parent / "cookies.txt",
+    ):
+        if candidate.exists():
+            return {"cookiefile": str(candidate)}
+    return {}
+
+

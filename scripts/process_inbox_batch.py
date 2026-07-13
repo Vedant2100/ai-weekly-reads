@@ -14,8 +14,10 @@ from project_paths import INBOX
 from resources import write_resource
 from send_to_kindle import maybe_send_to_kindle
 from sources import MediaItem, read_inbox, resolve_link
-from summarize import get_or_create_summary
+from summarize import _local_summary, get_or_create_summary, summary_path_for
+from transcript_store import find_raw_transcript, write_raw_transcript
 from transcripts import get_or_create_transcript
+from utils import write_text
 
 
 def process_inbox_batch(inbox_path: Path = INBOX / "links.txt") -> bool:
@@ -51,13 +53,30 @@ def process_inbox_batch(inbox_path: Path = INBOX / "links.txt") -> bool:
         try:
             transcript_path, method = get_or_create_transcript(item, settings)
             if not transcript_path or not transcript_path.exists():
-                print(f"Notice: Could not acquire transcript/content for {item.title}")
-                continue
-            summary_path = get_or_create_summary(item, transcript_path, settings)
-            if summary_path and summary_path.exists():
-                res_path = write_resource(item, summary_path, transcript_path, method)
-                resource_paths.append(res_path)
-                print(f"✅ Summary created: {res_path.name}")
+                print(f"Notice: Full transcript unavailable for {item.title}; creating fallback entry.")
+                fallback_text = (
+                    f"Title: {item.title}\n"
+                    f"URL: {item.url}\n\n"
+                    "Full text/transcript could not be extracted.\n\n"
+                    f"{item.description or ''}"
+                )
+                transcript_path = write_raw_transcript(item, fallback_text, find_raw_transcript(item.id))
+                method = "unavailable"
+
+            summary_path = None
+            try:
+                summary_path = get_or_create_summary(item, transcript_path, settings)
+            except Exception as sum_exc:
+                print(f"Notice: AI summary generation failed for {item.title} ({sum_exc}). Using fallback summary.")
+
+            if not summary_path or not summary_path.exists():
+                summary_path = summary_path_for(item)
+                note = "We were unable to generate an AI summary for this link, but have kept the link and description in the ebook."
+                write_text(summary_path, _local_summary(item, "", settings, note=note))
+
+            res_path = write_resource(item, summary_path, transcript_path, method)
+            resource_paths.append(res_path)
+            print(f"✅ Included in ebook: {res_path.name}")
         except Exception as exc:
             print(f"❌ Failed processing {item.title}: {exc}")
 

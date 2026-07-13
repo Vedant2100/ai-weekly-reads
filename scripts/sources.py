@@ -22,7 +22,7 @@ try:
 except ImportError:  # pragma: no cover - depends on local environment
     BeautifulSoup = None
 
-from utils import is_url, stable_id, youtube_video_id, ytdlp_js_runtimes
+from utils import is_url, stable_id, youtube_video_id, ytdlp_cookie_options, ytdlp_js_runtimes
 
 
 @dataclass
@@ -237,15 +237,26 @@ def _youtube_item(url: str) -> MediaItem:
     try:
         import yt_dlp
 
-        with yt_dlp.YoutubeDL(
-            {
-                "quiet": True,
-                "no_warnings": True,
-                "skip_download": True,
-                "extract_flat": False,
-                "js_runtimes": ytdlp_js_runtimes(),
-            }
-        ) as ydl:
+        class _QuietLogger:
+            def debug(self, msg: str) -> None:
+                pass
+
+            def warning(self, msg: str) -> None:
+                pass
+
+            def error(self, msg: str) -> None:
+                pass
+
+        ydl_opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "skip_download": True,
+            "extract_flat": False,
+            "js_runtimes": ytdlp_js_runtimes(),
+            "logger": _QuietLogger(),
+        }
+        ydl_opts.update(ytdlp_cookie_options())
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
         title = info.get("title") or title
         description = info.get("description")
@@ -254,7 +265,16 @@ def _youtube_item(url: str) -> MediaItem:
         if upload_date and len(upload_date) == 8:
             published = f"{upload_date[:4]}-{upload_date[4:6]}-{upload_date[6:]}"
     except Exception as exc:
-        print(f"Could not fetch YouTube metadata for {url}: {exc}")
+        err_msg = str(exc)
+        if "bot" in err_msg.lower() or "cookies" in err_msg.lower():
+            print(
+                f"Notice: YouTube requested authentication for {url} "
+                "(set YTDLP_COOKIES_FROM_BROWSER=chrome/safari in .env to authenticate); "
+                "falling back to oEmbed metadata."
+            )
+        else:
+            first_line = err_msg.splitlines()[0] if err_msg else "unknown error"
+            print(f"Notice: yt-dlp metadata fetch failed for {url} ({first_line}); falling back to oEmbed.")
 
     # Fallback to official oEmbed API if metadata failed or channel/title is missing
     if not source_name or title == url:

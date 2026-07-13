@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 from project_paths import MEDIA
-from utils import youtube_video_id, ytdlp_js_runtime_args
+from utils import youtube_video_id, ytdlp_cookie_args, ytdlp_js_runtime_args
 
 
 def fetch_youtube_captions(url: str) -> str | None:
@@ -32,6 +32,7 @@ def download_youtube_audio(url: str, item_id: str) -> Path | None:
         "-m",
         "yt_dlp",
         *ytdlp_js_runtime_args(),
+        *ytdlp_cookie_args(),
         "--extract-audio",
         "--audio-format",
         "mp3",

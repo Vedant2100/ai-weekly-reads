@@ -40,7 +40,9 @@ jobs:
       - name: Process Inbox & Build Ebook
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          YTDLP_COOKIES_TXT: ${{ secrets.YTDLP_COOKIES_TXT }}
           KINDLE_ENABLED: "true"
+
           KINDLE_DELIVERY_METHOD: "smtp"
           KINDLE_EMAIL: ${{ secrets.KINDLE_EMAIL }}
           KINDLE_SENDER_EMAIL: ${{ secrets.KINDLE_SENDER_EMAIL }}
