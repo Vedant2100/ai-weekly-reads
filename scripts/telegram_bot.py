@@ -70,14 +70,23 @@ def add_to_inbox(links: list[str]) -> int:
     with open(inbox_path, "a", encoding="utf-8") as f:
         for link in links:
             f.write(f"{link.strip()}\n")
+
+    # Silently stage, commit, and push to GitHub
+    import subprocess
+    try:
+        subprocess.run(["git", "add", str(inbox_path)], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["git", "commit", "-m", "🤖 Add link(s) via Telegram bot"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["git", "push"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        print(f"🚀 Silently synced {len(links)} link(s) to GitHub repository.")
+    except Exception as exc:
+        print(f"Notice: Automated git push failed: {exc}")
+
     return len(read_inbox(inbox_path, []))
 
 
 def run_telegram_bot():
     token = get_token()
-    print("🤖 Telegram Bot started! Listening for links and commands...")
-    print("Send any URL (PDF, YouTube, X tweet, article) to your bot in Telegram.")
-    print("Send /ebook or /generate to compile and receive your EPUB ebook directly in chat!")
+    print("🤖 Telegram Bot started! Listening silently for links and channel posts...")
     
     offset = 0
     while True:
@@ -87,58 +96,22 @@ def run_telegram_bot():
                 data = resp.json()
                 for result in data.get("result", []):
                     offset = result["update_id"] + 1
-                    message = result.get("message") or result.get("channel_post")
+                    message = (
+                        result.get("message")
+                        or result.get("channel_post")
+                        or result.get("edited_message")
+                        or result.get("edited_channel_post")
+                    )
                     if not message or "text" not in message:
                         continue
                     
                     chat_id = message["chat"]["id"]
                     text = message["text"].strip()
-                    print(f"\n📩 Received message from chat {chat_id}: {text}")
-
-                    if text.lower() in {"/start", "/help"}:
-                        help_msg = (
-                            "👋 Welcome to AI Weekly Reads Bot!\n\n"
-                            "📥 Drop ANY link here (arXiv PDF, YouTube video, X thread, blog article).\n"
-                            "📚 Send /ebook (or /run) when you're ready to compile them all into a topic-categorized EPUB ebook!"
-                        )
-                        send_message(token, chat_id, help_msg)
-                        continue
-
-                    if text.lower() in {"/ebook", "/run", "/generate", "/build"}:
-                        inbox_path = INBOX / "links.txt"
-                        links = read_inbox(inbox_path, []) if inbox_path.exists() else []
-                        if not links:
-                            send_message(token, chat_id, "📭 Your reading inbox is currently empty! Send me some links first.")
-                            continue
-                        
-                        send_message(token, chat_id, f"🚀 Generating topic-categorized AI ebook from {len(links)} link(s) using Gemini 3.1 Flash...\n⏳ Please wait ~30-60 seconds!")
-                        
-                        before_files = set(OUTPUT.glob("*.*"))
-                        try:
-                            success = process_inbox_batch(inbox_path)
-                            if success:
-                                after_files = set(OUTPUT.glob("*.*")) - before_files
-                                candidate_files = [p for p in (after_files if after_files else OUTPUT.glob("*.*")) if p.suffix in {".epub", ".md", ".html"}]
-                                newest_file = sorted(candidate_files, key=lambda p: p.stat().st_mtime, reverse=True)[0] if candidate_files else None
-                                
-                                if newest_file and newest_file.exists():
-                                    send_message(token, chat_id, f"✅ Ebook compiled successfully! Uploading your {newest_file.suffix[1:].upper()} file now...")
-                                    send_document(token, chat_id, newest_file, caption=f"📘 {newest_file.stem}\n\nTap to open or read!")
-                                else:
-                                    send_message(token, chat_id, "✅ Processing finished, but could not locate the output file.")
-                            else:
-                                send_message(token, chat_id, "❌ Batch processing encountered an error or no valid summaries were produced.")
-                        except Exception as exc:
-                            send_message(token, chat_id, f"❌ Error running batch processor: {exc}")
-                        continue
+                    print(f"\n📩 Ingesting update from chat {chat_id}...")
 
                     urls = extract_urls(text)
                     if urls:
-                        total_count = add_to_inbox(urls)
-                        msg = f"✅ Added {len(urls)} link(s) to inbox! (Total queued: {total_count})\n💡 Reply /ebook anytime to generate your EPUB ebook!"
-                        send_message(token, chat_id, msg)
-                    else:
-                        send_message(token, chat_id, "ℹ️ Please send valid URLs (starting with http:// or https://) or send /ebook to build your ebook.")
+                        add_to_inbox(urls)
             time.sleep(1)
         except KeyboardInterrupt:
             print("\n🛑 Telegram Bot stopped by user.")
