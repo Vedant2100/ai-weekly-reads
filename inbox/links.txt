@@ -1,1 +1,2 @@
 # Add links here (one per line). Run python3 scripts/process_inbox_batch.py to process.
+https://x.com/i/status/2076721174130913691
