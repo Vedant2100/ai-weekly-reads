@@ -1,9 +1,9 @@
 ---
-title: "AI Weekly Reads - 2026-07-14"
+title: "AI Weekly Reads - 2026-07-15"
 aliases:
-  - "AI Weekly Reads - 2026-07-14"
-  - "AI Weekly Reads 2026-07-14"
-created: "2026-07-14"
+  - "AI Weekly Reads - 2026-07-15"
+  - "AI Weekly Reads 2026-07-15"
+created: "2026-07-15"
 type: "weekly-book"
 status: "ready"
 language: "en"
@@ -11,7 +11,7 @@ language: "en"
 
 # AI Weekly Reads
 
-Week of 2026-07-14
+Week of 2026-07-15
 
 [Download the latest EPUB for Kindle](latest.epub)
 
@@ -19,34 +19,34 @@ Week of 2026-07-14
 
 ### 📰 General AI & Tech Insights
 
-1. [Yutong Bai / x_thread] Mon Jul 13 - When does continual learning actually require learning?
+1. [Soham Ray / x_thread] Tue Jul 14 - Research Trends at ICML 2026 
 
 ## Reading Notes
 
 ### 📰 General AI & Tech Insights
 
-# When does continual learning actually require learning?
+# Research Trends at ICML 2026 
 
-> 📅 **Published:** Mon Jul 13  |  🔗 **Source:** [Yutong Bai](https://x.com/i/status/2076721174130913691)  |  🗣️ **Speakers:** Anne Harrington; Nayan Saxena; Michael Murphy; Anastasia Borovykh; Zeyu Yun; Sridhar Kamath; Ara Eindra Kyi; Trevor Darrell; Jitendra Malik
+> 📅 **Published:** Tue Jul 14  |  🔗 **Source:** [Soham Ray](https://x.com/i/status/2077157003387109542)
 
 ## One-Sentence Takeaway
 
-Continual learning in large language models is not a singular problem but a spectrum of challenges, where the specific type of data or task change dictates which learning method will succeed, rendering universal solutions ineffective.
+AI research is undergoing a fundamental shift, moving towards automated methods and sophisticated synthetic data generation, while the primary challenge transitions from building models to rigorously evaluating them for real-world utility.
 
 ## Short Summary
 
-Traditional continual learning focused on preventing catastrophic forgetting when models learned new tasks. However, for modern large language models (LLMs), the challenge has evolved into increasing competence as the operational environment changes, rather than merely retaining old skills. This work introduces a unified framework to define and measure continual learning in LLMs, categorizing change along "Space" (domain/task shift) and "Time" (world drift, further divided into slow trends, discrete fact changes, and agentic accumulation).
+The landscape of AI research is rapidly evolving, characterized by a growing emphasis on automated research pipelines and the "factory-like" production of AI components. This includes the development of "AI research scientists" and more elaborate data generation and LLM-judge loops, aiming to increase both thoroughness and throughput. However, a critical human element, "research taste"—the intuition for valuable research directions—remains largely unquantified and absent in current AI systems.
 
-The research evaluates various continual learning methods—including prompting, fine-tuning, reinforcement learning, and context compression—under this framework. It reveals that no single method performs optimally across all types of change due to inherent tradeoffs. This finding underscores the necessity of characterizing the specific nature of environmental change before selecting or designing a continual learning strategy, challenging the utility of single-metric benchmarks for evaluating LLM adaptability.
+Concurrently, the focus of AI development is shifting significantly towards evaluation. As model building becomes easier, the challenge lies in determining *what* and *how* to evaluate, especially given the rapid saturation of public benchmarks. These benchmarks often fail to reflect real-world deployment distributions, leading to models that score well but perform poorly in practice. Frontier labs address this by using extensive internal evaluation environments and usage data, while advancements in synthetic data generation and LLM judges are maturing to support more robust and personalized agent development, particularly concerning memory and long-horizon tasks.
 
 ## Main Ideas
 
-*   **Redefining Continual Learning for LLMs**: For large language models, continual learning is redefined as the problem of increasing competence as the world they operate in changes, moving beyond the classic focus on mitigating catastrophic forgetting of old tasks.
-*   **Unified Framework for Change**: A new framework categorizes environmental change along two axes: "Space" (classical domain or task shift) and "Time" (world drift where the task remains the same but underlying data changes).
-*   **Three Sub-Regimes of Temporal Change**: "Time" is further broken down into slow trends (requiring alignment to evolving structure), discrete fact changes (requiring belief rewriting), and agentic accumulation (where prior actions alter the environment state).
-*   **Method-Specific Tradeoffs**: Different continual learning methods (e.g., prompt-based, distillation-based, context compression, reinforcement learning) exhibit distinct tradeoffs, making them suitable for specific types of change but poor for others.
-*   **No Universal Solution**: No single method effectively handles all kinds of change, implying that a "one-size-fits-all" approach to continual learning is ineffective for LLMs.
-*   **Limitations of Single Benchmarks**: A single benchmark number cannot adequately reveal whether a model is truly continually learning or merely reshuffling existing knowledge, due to the diverse nature of change and method tradeoffs.
+*   **Automated Research is Emerging but Immature**: Efforts are underway to create "AI research scientists" and automate post-training and LLM research, with Google investing heavily. However, practical outcomes still lag behind the hype, and the field struggles to reliably validate claims or automate peer review without rigorous evaluation.
+*   **Research Adopting "Factory" Pipelines**: AI development is increasingly characterized by elaborate pipelines and generator loops for data generation and LLM-judging, aiming to boost research thoroughness and throughput.
+*   **"Research Taste" Remains a Human Bottleneck**: Despite LLMs' vast knowledge, the ability to discern valuable research directions ("taste") is largely absent. Quantifying, replicating, and scaling this human intuition is an open question.
+*   **Evaluation is the New Bottleneck**: As building AI models becomes easier, the primary challenge shifts to deciding *what* and *how* to evaluate. Automating this process is seen as crucial for recursive self-improvement.
+*   **Public Benchmarks are Saturating and Misleading**: Many benchmarks are quickly saturating, and models optimized for them often perform poorly in real-world deployment because public benchmarks are a narrow sample of actual usage distributions. Frontier labs use extensive internal environments to bridge this gap.
+*   **Memory is Key for Personalized, Long-Horizon Agents**: Research on agent memory focuses on what to remember, forget, and how memory architectures evolve. Memory is essential for personalizing agents across sessions but also introduces new attack surfaces like memory poisoning.
 
 ## Questions And Answers
 
@@ -54,29 +54,46 @@ No distinct Q&A section.
 
 ## Notable Details
 
-*   The research recasts standard LLM benchmarks as sequential problems to evaluate methods under a mechanism-agnostic protocol.
-*   Eight methods across four families were tested on a Qwen3-8B backbone model.
-*   Methods differ in what they carry across stage boundaries: a prompt, the weights, or a small per-stage component on a frozen backbone.
-*   **Prompt-based methods**: Fit current stages quickly but degrade sharply on future ones.
-*   **Distillation-based methods**: Accumulate knowledge stably but struggle to update outdated facts.
-*   **Context compression**: Primarily improves efficiency without substantially improving the ability to learn new tasks.
-*   **Reinforcement learning**: Adapts most effectively to factual change but is sensitive to noisy reward signals.
+*   ICML 2026 in Seoul featured ~6,800 accepted papers and attendance from every major lab.
+*   Google showcased an "End-to-End AI Scientist" expo panel and the MARS auto-research agent.
+*   A systematic study of 60 benchmarks found about half showing saturation symptoms.
+*   The oral "Benchmarking at the Edge of Comprehension" addresses challenges when humans can no longer author discriminative tasks.
+*   "Less is Enough" (an oral) demonstrated matching a 300K-sample dataset with only 2K feature-targeted synthetic samples.
+*   Google's "Simula" proposes agentic generation as a replacement for expensive human annotation.
+*   "REAL" trains LLM judges as calibrated reward scorers, and "Rubric Curriculum RL" evolves rubric criteria during training.
 
 ## Actionable Takeaways
 
-*   **Characterize Change First**: Before deploying or updating LLMs in dynamic environments, thoroughly characterize the specific type of data or task change expected (e.g., slow trends, discrete facts, agentic accumulation).
-*   **Adopt Tailored Strategies**: Avoid relying on a single continual learning method; instead, select or combine methods specifically suited to the identified types of change.
-*   **Rethink Evaluation Metrics**: Be skeptical of single-metric benchmarks for continual learning; comprehensive evaluation requires assessing performance across diverse change regimes.
-*   **Explore Hybrid Approaches**: Consider developing hybrid continual learning systems that can dynamically switch or combine methods based on the detected nature of environmental drift.
+*   **Re-evaluate Data Needs**: Regularly question current assumptions about the necessity of human-annotated data, as synthetic data generation capabilities are rapidly advancing and reducing reliance on human input.
+*   **Prioritize Deployment-Aligned Evaluation**: Shift focus from optimizing for public benchmark scores to developing and utilizing internal, comprehensive evaluation suites that accurately reflect real-world deployment distributions.
+*   **Investigate "Research Taste"**: Explore methods to quantify or integrate human "research taste" into automated AI research pipelines, as this remains a critical, unscaled human capability.
+*   **Design Secure Memory Architectures**: When developing personalized or long-horizon AI agents, carefully consider the design of memory systems not only for functionality but also for security against potential attack surfaces like memory poisoning.
 
 ## People, Companies, Tools, And Links Mentioned
 
-*   Qwen3-8B (model backbone)
-*   UC Berkeley
-*   [https://arxiv.org/abs/2607.07847](https://arxiv.org/abs/2607.07847) (Paper link)
+*   Ola Zytek
+*   Ben Shi
+*   Pedram Razavi
+*   Victor Barres
+*   Arvind Narayanan
+*   Google
+*   ICML
+*   MARS (auto-research agent)
+*   InnoEval (evaluating research ideas)
+*   REAL (LLM judge training)
+*   Rubric Curriculum RL (LLM judge training)
+*   Simula (Google's agentic generation)
+*   MemEvolve (memory architecture evolution)
+*   Persona2Web (benchmarking personalized web agents)
+*   MCP-Persona (personalized tools and tasks)
+*   tau-bench (evaluation benchmark)
+*   tau2-bench (evaluation benchmark)
+*   tau-Knowledge (evaluation benchmark)
+*   tau-Voice (evaluation benchmark)
+*   [ICML 2026 Research Trends](https://x.com/i/status/2077157003387109542)
 
 ## Reading Priority
 
-Medium – This source presents a critical re-evaluation of continual learning for LLMs, proposing a novel framework and demonstrating empirically that the type of data change dictates method effectiveness, which is highly consequential for LLM deployment and research.
+Medium – This post offers a concise, insightful overview of significant shifts and emerging trends in AI research and evaluation from a major conference, providing valuable context for professionals in the field.
 
 ***
