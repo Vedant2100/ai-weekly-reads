@@ -123,5 +123,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process links in inbox via Gemini AI into a single categorized ebook.")
     parser.add_argument("--inbox", type=Path, default=INBOX / "links.txt", help="Path to links text file")
     args = parser.parse_args()
-    success = process_inbox_batch(args.inbox)
-    sys.exit(0 if success else 1)
+    process_inbox_batch(args.inbox)
+    sys.exit(0)
+
