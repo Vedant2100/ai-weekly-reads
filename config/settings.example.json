@@ -20,7 +20,7 @@
   },
   "kindle": {
     "enabled": false,
-    "delivery_method": "gmail_api",
+    "delivery_method": "apps_script",
     "kindle_email": "yourname_123@kindle.com",
     "sender_email": "",
     "gmail_credentials_path": "config/private/gmail_credentials.json",
@@ -41,10 +41,12 @@
   },
   "email": {
     "enabled": false,
-    "delivery_method": "gmail_api",
+    "delivery_method": "apps_script",
     "recipient_email": "",
     "sender_email": "",
     "subject_prefix": "AI Research Reorientation",
+    "apps_script_url": "",
+    "apps_script_secret_env": "RESEARCH_DIGEST_SECRET",
     "gmail_credentials_path": "config/private/google_credentials.json",
     "gmail_token_path": "config/private/google_token.json",
     "smtp_host": "smtp.gmail.com",

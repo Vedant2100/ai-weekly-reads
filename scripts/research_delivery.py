@@ -9,6 +9,8 @@ from email.message import EmailMessage
 from pathlib import Path
 from typing import Any
 
+import requests
+
 from config import Settings
 from project_paths import ROOT
 from utils import write_text
@@ -16,6 +18,46 @@ from utils import write_text
 
 GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send"
 GOOGLE_SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets"
+
+
+def deliver_research_digest_via_apps_script(
+    subject: str,
+    body: str,
+    rows: list[dict[str, Any]],
+    settings: Settings,
+) -> str:
+    """Let the already-authorized Apps Script send mail and append Sheet rows."""
+    email_settings = settings.email
+    url = str(email_settings.get("apps_script_url") or os.environ.get("RESEARCH_APPS_SCRIPT_URL") or "").strip()
+    secret_env = str(email_settings.get("apps_script_secret_env") or "RESEARCH_DIGEST_SECRET")
+    secret = os.environ.get(secret_env, "").strip()
+    if not url:
+        raise RuntimeError("Research delivery is not configured: RESEARCH_APPS_SCRIPT_URL is missing.")
+    if not secret:
+        raise RuntimeError(f"Research delivery is not configured: {secret_env} is missing.")
+
+    response = requests.post(
+        url,
+        json={
+            "action": "research_digest",
+            "secret": secret,
+            "subject": subject,
+            "body": body,
+            "html_body": _markdown_to_html(body),
+            "rows": rows,
+        },
+        timeout=180,
+    )
+    response.raise_for_status()
+    try:
+        result = response.json()
+    except ValueError as exc:
+        raise RuntimeError("Apps Script returned a non-JSON response.") from exc
+    if not result.get("ok"):
+        raise RuntimeError(
+            f"Apps Script rejected the digest: {result.get('error', 'unknown error')}"
+        )
+    return f"Sent research digest via Apps Script to {result.get('recipient', 'the configured Google account')}."
 
 
 def send_research_email(subject: str, body: str, settings: Settings) -> str:

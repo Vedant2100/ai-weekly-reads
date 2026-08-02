@@ -123,7 +123,7 @@ For a manual test/send:
 .venv/bin/python scripts/research_digest.py --force
 ```
 
-The Codex project automation runs this every three days. The persisted state in `inbox/research_state.json` is an additional safety guard. GitHub's digest workflow is manual-only to prevent duplicate emails; Telegram capture still uses GitHub and the automation pulls those commits before processing. Links remain queued if email or Google Sheets delivery fails.
+GitHub Actions checks the queue daily, while `inbox/research_state.json` enforces a true three-day interval. Delivery uses the existing Google Apps Script authorization for both email and Sheets, so no local Google OAuth setup is required. Links remain queued unless Apps Script confirms both operations succeeded.
 
 ### Legacy Builders
 
@@ -225,7 +225,7 @@ GOOGLE_SHEETS_WORKSHEET=Links
 
 The OAuth token must include both Gmail send and Google Sheets scopes. Google Sheets is required: the digest will not send or clear the queue until the row append succeeds. If no spreadsheet ID is supplied, the first successful run creates `AI Research Link Library`, records its URL in `inbox/research_state.json`, and appends future rows to it. Each row records capture time, type (`yt`, `pdf`, `link`, `podcast`, or `x`), title, URL, source, publication date, extraction method, summary status, and digest date.
 
-For the local Codex automation, keep the Google client/token files under `config/private/`. For the optional manual GitHub workflow, provide `GOOGLE_CREDENTIALS_JSON` and `GOOGLE_TOKEN_JSON` secrets plus the email and sheet secrets used by `.github/workflows/process_inbox.yml`.
+The GitHub workflow uses the existing Apps Script deployment. It needs the existing `GEMINI_API_KEY` and `GITHUB_PAT` repository secrets; Apps Script uses its existing authorization and the `GITHUB_PAT` value as the delivery secret unless `RESEARCH_DIGEST_SECRET` is configured as a script property.
 
 Kindle delivery is disabled in the active workflows. Do not set `KINDLE_ENABLED=true` unless you intentionally restore that path.
 

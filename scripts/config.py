@@ -112,10 +112,12 @@ def _substack_settings(raw: dict[str, Any] | None) -> dict[str, Any]:
 def _email_settings(raw: dict[str, Any] | None) -> dict[str, Any]:
     email = {
         "enabled": False,
-        "delivery_method": "gmail_api",
+        "delivery_method": "apps_script",
         "recipient_email": "",
         "sender_email": "",
         "subject_prefix": "AI Research Reorientation",
+        "apps_script_url": "",
+        "apps_script_secret_env": "RESEARCH_DIGEST_SECRET",
         "gmail_credentials_path": "config/private/google_credentials.json",
         "gmail_token_path": "config/private/google_token.json",
         "smtp_host": "smtp.gmail.com",
@@ -131,6 +133,8 @@ def _email_settings(raw: dict[str, Any] | None) -> dict[str, Any]:
     _set_env_value(email, "sender_email", "EMAIL_SENDER")
     _set_env_value(email, "sender_email", "RESEARCH_EMAIL_FROM")
     _set_env_value(email, "subject_prefix", "EMAIL_SUBJECT_PREFIX")
+    _set_env_value(email, "apps_script_url", "RESEARCH_APPS_SCRIPT_URL")
+    _set_env_value(email, "apps_script_secret_env", "RESEARCH_DIGEST_SECRET_ENV")
     _set_env_value(email, "gmail_credentials_path", "GOOGLE_CREDENTIALS_PATH")
     _set_env_value(email, "gmail_token_path", "GOOGLE_TOKEN_PATH")
     _set_env_value(email, "smtp_host", "EMAIL_SMTP_HOST")

@@ -12,7 +12,12 @@ import requests
 
 from config import load_settings
 from project_paths import INBOX, RESOURCES, ROOT, ensure_dirs
-from research_delivery import append_link_rows, classify_link, send_research_email
+from research_delivery import (
+    append_link_rows,
+    classify_link,
+    deliver_research_digest_via_apps_script,
+    send_research_email,
+)
 from resources import write_resource
 from sources import MediaItem, read_inbox, resolve_link
 from summarize import (
@@ -36,11 +41,9 @@ def run_research_digest(*, force: bool = False) -> bool:
     ensure_dirs()
     load_dotenv(ROOT / ".env")
     settings = load_settings()
-    if not settings.google_sheets.get("enabled"):
-        print("Google Sheets indexing is required. Set google_sheets.enabled=true before sending a digest.")
-        return False
     state = _read_state()
-    _retry_pending_sheet_rows(state, settings)
+    if not _uses_apps_script(settings):
+        _retry_pending_sheet_rows(state, settings)
     links = read_inbox(INBOX / "links.txt", [])
     if not links:
         print("No queued research links.")
@@ -85,20 +88,25 @@ def run_research_digest(*, force: bool = False) -> bool:
     reorientation = _generate_reorientation(items, previous, settings)
     email_body = _compose_email(items, reorientation, now)
 
-    pending_sheet_rows: list[dict[str, Any]] = []
-    rows_to_append = list(state.get("pending_sheet_rows", [])) + sheet_rows
-    try:
-        sheet_status = append_link_rows(rows_to_append, settings, state)
-    except Exception as exc:
-        pending_sheet_rows = rows_to_append
-        print(f"Google Sheets update failed: {exc}")
-        print("Keeping the inbox queued; no email will be sent until the Sheet is updated.")
-        return False
-
     prefix = str(settings.email.get("subject_prefix") or "AI Research Reorientation")
     subject = f"{prefix} — {now.date().isoformat()} ({len(items)} links)"
     try:
-        email_status = send_research_email(subject, email_body, settings)
+        if _uses_apps_script(settings):
+            rows_to_append = list(state.get("pending_sheet_rows", [])) + sheet_rows
+            email_status = deliver_research_digest_via_apps_script(subject, email_body, rows_to_append, settings)
+            sheet_status = "Google Sheets rows appended by Apps Script."
+            pending_sheet_rows: list[dict[str, Any]] = []
+        else:
+            pending_sheet_rows = []
+            rows_to_append = list(state.get("pending_sheet_rows", [])) + sheet_rows
+            try:
+                sheet_status = append_link_rows(rows_to_append, settings, state)
+            except Exception as exc:
+                pending_sheet_rows = rows_to_append
+                print(f"Google Sheets update failed: {exc}")
+                print("Keeping the inbox queued; no email will be sent until the Sheet is updated.")
+                return False
+            email_status = send_research_email(subject, email_body, settings)
     except Exception as exc:
         print(f"Research email failed: {exc}")
         return False
@@ -121,6 +129,10 @@ def run_research_digest(*, force: bool = False) -> bool:
     print(sheet_status)
     print(f"Archived {len(links)} Telegram links and cleared the queue.")
     return True
+
+
+def _uses_apps_script(settings) -> bool:
+    return str(settings.email.get("delivery_method") or "").strip().lower() in {"apps_script", "google_apps_script"}
 
 
 def _retry_pending_sheet_rows(state: dict[str, Any], settings) -> None:
