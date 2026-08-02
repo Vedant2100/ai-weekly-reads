@@ -42,7 +42,7 @@ jobs:
           YTDLP_COOKIES_TXT: ${{ secrets.YTDLP_COOKIES_TXT }}
           EMAIL_ENABLED: "true"
           EMAIL_DELIVERY_METHOD: "apps_script"
-          RESEARCH_APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbxSvqlBWS_bhD7GenOID2vtNjJLZP69Xe_rhyH8ku2OoY8afbaqS9qC1ZQ4FRn9EmcC_A/exec"
+          RESEARCH_APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbwuKOAMN3Jbb9KXhX9ez5RD6jzuZevdeSPDGS5A4ENS37i0EmSUF2EUOBf0i5JsYuJYNw/exec"
           RESEARCH_DIGEST_SECRET: ${{ secrets.GITHUB_PAT }}
         run: |
           python scripts/research_digest.py || test $? -eq 1

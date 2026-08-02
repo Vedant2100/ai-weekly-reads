@@ -1,0 +1,3 @@
+[submodule "research-implementation-engine"]
+	path = research-implementation-engine
+	url = git@github.com:Vedant2100/research-implementation-engine.git
