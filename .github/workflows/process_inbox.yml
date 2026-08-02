@@ -27,10 +27,12 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Install system dependencies (Pandoc)
+      - name: Install system dependencies (Pandoc & Typst)
         run: |
           sudo apt-get update
           sudo apt-get install -y pandoc
+          curl -sL https://github.com/typst/typst/releases/latest/download/typst-x86_64-unknown-linux-musl.tar.gz | tar -xz
+          sudo mv typst-x86_64-unknown-linux-musl/typst /usr/local/bin/
 
       - name: Install Python dependencies
         run: |

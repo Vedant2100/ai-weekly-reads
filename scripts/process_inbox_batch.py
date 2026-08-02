@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from config import load_settings
 from digest import build_digest
-from ebook import build_kindle_file
+from ebook import build_kindle_file, build_pdf_file
 from project_paths import INBOX
 from resources import write_resource
 from send_to_kindle import maybe_send_to_kindle
@@ -108,12 +108,13 @@ def process_inbox_batch(inbox_path: Path = INBOX / "links.txt") -> bool:
             print(f"Notice: Kindle delivery failed: {exc}")
 
     if os.environ.get("REMARKABLE_DEVICE_TOKEN"):
-        print("📝 Sending to reMarkable Cloud...")
+        print("📝 Generating PDF & Sending to reMarkable Cloud...")
         try:
-            res = maybe_send_to_remarkable(kindle_path)
-            print(f"✅ reMarkable delivery: {res}")
+            pdf_path = build_pdf_file(digest_path)
+            res = maybe_send_to_remarkable(pdf_path)
+            print(f"✅ reMarkable PDF delivery: {res}")
         except Exception as exc:
-            print(f"Notice: reMarkable delivery failed: {exc}")
+            print(f"Notice: reMarkable PDF delivery failed: {exc}")
 
     # Archive processed links
     archive_path = INBOX / "archive.txt"

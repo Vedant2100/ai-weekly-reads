@@ -22,6 +22,36 @@ def build_kindle_file(markdown_path: Path, settings: Settings) -> Path:
     return _build_epub(markdown_path)
 
 
+def build_pdf_file(markdown_path: Path) -> Path:
+    pdf_path = OUTPUT / f"{markdown_path.stem}.pdf"
+    pandoc = shutil.which("pandoc")
+    typst_cli = shutil.which("typst")
+
+    if pandoc and typst_cli:
+        try:
+            subprocess.run(
+                [pandoc, str(markdown_path), "--pdf-engine=typst", "-o", str(pdf_path)],
+                check=True,
+            )
+            print(f"📄 PDF generated via pandoc+typst: {pdf_path}")
+            return pdf_path
+        except Exception as exc:
+            print(f"Notice: Pandoc typst PDF build failed ({exc}), trying fallback...")
+
+    if pandoc:
+        try:
+            subprocess.run(
+                [pandoc, str(markdown_path), "-o", str(pdf_path)],
+                check=True,
+            )
+            print(f"📄 PDF generated via pandoc: {pdf_path}")
+            return pdf_path
+        except Exception as exc:
+            print(f"Notice: Pandoc direct PDF build failed ({exc}).")
+
+    return pdf_path
+
+
 def _build_epub(markdown_path: Path) -> Path:
     pandoc = shutil.which("pandoc")
     if not pandoc:
