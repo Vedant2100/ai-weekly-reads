@@ -3,6 +3,8 @@ name: Telegram Webhook
 on:
   repository_dispatch:
     types: [telegram_webhook]
+  workflow_dispatch:
+
 
 permissions:
   contents: write
