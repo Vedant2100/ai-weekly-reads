@@ -2,8 +2,8 @@ name: Poll Telegram for Links
 
 on:
   schedule:
-    # Run automatically every day at 9:45 AM PT (16:45 UTC)
-    - cron: "45 16 * * *"
+    # Poll Telegram every 15 minutes to collect links & auto-handle /send commands
+    - cron: "*/15 * * * *"
   workflow_dispatch:
 
 permissions:
