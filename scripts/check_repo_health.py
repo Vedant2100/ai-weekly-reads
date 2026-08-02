@@ -85,6 +85,10 @@ def _check_settings(path: Path, errors: list[str]) -> None:
         errors.append(f"{label}: summary_model must not be empty.")
     if not str(settings.summary_fallback_model or "").strip():
         errors.append(f"{label}: summary_fallback_model must not be empty.")
+    if not settings.google_sheets.get("enabled"):
+        errors.append(f"{label}: google_sheets.enabled must be true; link indexing is required.")
+    if not str(settings.google_sheets.get("worksheet_name") or "").strip():
+        errors.append(f"{label}: google_sheets.worksheet_name must not be empty.")
     if settings.transcription_provider not in {"mistral", "none", "gemini"}:
         errors.append(f"{label}: transcription_provider must be 'mistral', 'none', or 'gemini'.")
     if settings.kindle_output_format.lower() not in {"epub", "markdown", "md"}:

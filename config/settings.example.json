@@ -53,7 +53,7 @@
     "smtp_password_env": "EMAIL_SMTP_PASSWORD"
   },
   "google_sheets": {
-    "enabled": false,
+    "enabled": true,
     "spreadsheet_id": "",
     "worksheet_name": "Links",
     "title": "AI Research Link Library",

@@ -36,6 +36,9 @@ def run_research_digest(*, force: bool = False) -> bool:
     ensure_dirs()
     load_dotenv(ROOT / ".env")
     settings = load_settings()
+    if not settings.google_sheets.get("enabled"):
+        print("Google Sheets indexing is required. Set google_sheets.enabled=true before sending a digest.")
+        return False
     state = _read_state()
     _retry_pending_sheet_rows(state, settings)
     links = read_inbox(INBOX / "links.txt", [])
@@ -83,17 +86,14 @@ def run_research_digest(*, force: bool = False) -> bool:
     email_body = _compose_email(items, reorientation, now)
 
     pending_sheet_rows: list[dict[str, Any]] = []
-    if not settings.google_sheets.get("enabled"):
-        pending_sheet_rows = list(state.get("pending_sheet_rows", []))
-        sheet_status = "Google Sheets indexing disabled."
-    else:
-        rows_to_append = list(state.get("pending_sheet_rows", [])) + sheet_rows
-        try:
-            sheet_status = append_link_rows(rows_to_append, settings, state)
-        except Exception as exc:
-            pending_sheet_rows = rows_to_append
-            sheet_status = f"Google Sheets update pending: {exc}"
-            print(sheet_status)
+    rows_to_append = list(state.get("pending_sheet_rows", [])) + sheet_rows
+    try:
+        sheet_status = append_link_rows(rows_to_append, settings, state)
+    except Exception as exc:
+        pending_sheet_rows = rows_to_append
+        print(f"Google Sheets update failed: {exc}")
+        print("Keeping the inbox queued; no email will be sent until the Sheet is updated.")
+        return False
 
     prefix = str(settings.email.get("subject_prefix") or "AI Research Reorientation")
     subject = f"{prefix} — {now.date().isoformat()} ({len(items)} links)"

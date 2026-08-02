@@ -23,7 +23,7 @@ The active delivery path is:
 
 - **Capture:** send links to Telegram; the webhook appends them to `inbox/links.txt` and `inbox/link_capture.jsonl`
 - **Reorientation:** the scheduled runner summarizes each queued source and synthesizes it against prior digest context
-- **Delivery:** the runner emails one research digest and appends one typed row per link to Google Sheets
+- **Delivery:** the runner appends one typed row per link to Google Sheets, then emails one research digest
 
 Kindle ebook delivery is paused. The older EPUB/Kindle builders remain available for later, but no active workflow invokes them.
 
@@ -73,7 +73,7 @@ The project is local-first. Raw transcripts, resource notes, generated EPUBs, pr
 
 ## How YouTube And Podcasts Are Processed
 
-After capture, every queued item goes through the same research pipeline: stable ID, source resolution, transcript/PDF extraction, research-oriented summary, resource-note write, batch reorientation, email delivery, and Google Sheets append. The queue is only cleared after the email succeeds.
+After capture, every queued item goes through the same research pipeline: stable ID, source resolution, transcript/PDF extraction, research-oriented summary, resource-note write, batch reorientation, Google Sheets append, and email delivery. The queue is only cleared after both Sheet and email delivery succeed.
 
 ### YouTube
 
@@ -166,7 +166,7 @@ Local-only files:
 Important settings in `config/settings.json`:
 
 - `email`: recipient, sender, and Gmail API/SMTP delivery settings
-- `google_sheets`: append-only sheet settings; if no spreadsheet ID is supplied, the first run creates one and persists its ID in `inbox/research_state.json`
+- `google_sheets`: required append-only sheet settings; if no spreadsheet ID is supplied, the first run creates one and persists its ID in `inbox/research_state.json`
 - `publication_window_days`: legacy recurring-source window
 - `weekly_resource_limit`: legacy weekly-book limit
 - `max_items_per_run`: optional cost/safety cap; `0` means no cap
@@ -223,7 +223,7 @@ GOOGLE_SHEETS_SPREADSHEET_ID=optional-existing-sheet-id
 GOOGLE_SHEETS_WORKSHEET=Links
 ```
 
-The OAuth token must include both Gmail send and Google Sheets scopes. If no spreadsheet ID is supplied, the first successful run creates `AI Research Link Library`, records its URL in `inbox/research_state.json`, and appends future rows to it. Each row records capture time, type (`yt`, `pdf`, `link`, `podcast`, or `x`), title, URL, source, publication date, extraction method, summary status, and digest date.
+The OAuth token must include both Gmail send and Google Sheets scopes. Google Sheets is required: the digest will not send or clear the queue until the row append succeeds. If no spreadsheet ID is supplied, the first successful run creates `AI Research Link Library`, records its URL in `inbox/research_state.json`, and appends future rows to it. Each row records capture time, type (`yt`, `pdf`, `link`, `podcast`, or `x`), title, URL, source, publication date, extraction method, summary status, and digest date.
 
 For the local Codex automation, keep the Google client/token files under `config/private/`. For the optional manual GitHub workflow, provide `GOOGLE_CREDENTIALS_JSON` and `GOOGLE_TOKEN_JSON` secrets plus the email and sheet secrets used by `.github/workflows/process_inbox.yml`.
 
