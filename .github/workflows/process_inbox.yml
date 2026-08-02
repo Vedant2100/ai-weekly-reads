@@ -50,6 +50,8 @@ jobs:
           KINDLE_SMTP_PORT: ${{ secrets.KINDLE_SMTP_PORT }}
           KINDLE_SMTP_USERNAME: ${{ secrets.KINDLE_SMTP_USERNAME }}
           KINDLE_SMTP_PASSWORD: ${{ secrets.KINDLE_SMTP_PASSWORD }}
+          USER_EMAIL: ${{ secrets.USER_EMAIL }}
+          REMARKABLE_DEVICE_TOKEN: ${{ secrets.REMARKABLE_DEVICE_TOKEN }}
         run: |
           python scripts/process_inbox_batch.py
 

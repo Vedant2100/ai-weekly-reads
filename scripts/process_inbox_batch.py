@@ -13,6 +13,7 @@ from ebook import build_kindle_file
 from project_paths import INBOX
 from resources import write_resource
 from send_to_kindle import maybe_send_to_kindle
+from send_to_remarkable import maybe_send_to_remarkable
 from sources import MediaItem, read_inbox, resolve_link
 from summarize import _local_summary, get_or_create_summary, summary_path_for
 from transcript_store import find_raw_transcript, write_raw_transcript
@@ -98,12 +99,20 @@ def process_inbox_batch(inbox_path: Path = INBOX / "links.txt") -> bool:
     print(f"📘 Categorized Ebook File written: {kindle_path}")
 
     if isinstance(settings.kindle, dict) and settings.kindle.get("enabled"):
-        print("📧 Sending to Kindle...")
+        print("📧 Sending to Kindle / Gmail...")
         try:
-            maybe_send_to_kindle(kindle_path, settings)
-            print("✅ Sent to Kindle successfully!")
+            res = maybe_send_to_kindle(kindle_path, settings)
+            print(f"✅ Kindle / Gmail delivery: {res}")
         except Exception as exc:
             print(f"Notice: Kindle delivery failed: {exc}")
+
+    if os.environ.get("REMARKABLE_DEVICE_TOKEN"):
+        print("📝 Sending to reMarkable Cloud...")
+        try:
+            res = maybe_send_to_remarkable(kindle_path)
+            print(f"✅ reMarkable delivery: {res}")
+        except Exception as exc:
+            print(f"Notice: reMarkable delivery failed: {exc}")
 
     # Archive processed links
     archive_path = INBOX / "archive.txt"

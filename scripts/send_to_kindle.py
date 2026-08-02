@@ -63,14 +63,28 @@ def _send_with_smtp(file_path: Path, kindle: dict, recipient: str) -> str:
     if missing:
         return f"Kindle delivery skipped: missing {', '.join(missing)}."
 
-    message = _build_message(file_path, sender, recipient)
+    recipients = [r.strip() for r in recipient.split(",") if r.strip()]
+    user_email = os.environ.get("USER_EMAIL") or os.environ.get("GMAIL_RECIPIENT")
 
+    sent_to = []
     with smtplib.SMTP(kindle.get("smtp_host", "smtp.gmail.com"), int(kindle.get("smtp_port", 587))) as smtp:
         smtp.starttls()
         smtp.login(kindle.get("smtp_username") or sender, password)
-        smtp.send_message(message)
 
-    return f"Sent {file_path.name} to {recipient}."
+        # Kindle email: Send EPUB file attachment
+        for target in recipients:
+            message = _build_message(file_path, sender, target, is_text_only=False)
+            smtp.send_message(message)
+            sent_to.append(f"{target} (Kindle attachment)")
+
+        # Gmail personal inbox: Send full article text directly in email body (no file attachments)
+        if user_email and user_email.strip() not in recipients:
+            target_user = user_email.strip()
+            message = _build_message(file_path, sender, target_user, is_text_only=True)
+            smtp.send_message(message)
+            sent_to.append(f"{target_user} (Gmail text in body)")
+
+    return f"Sent {file_path.name} to {', '.join(sent_to)}."
 
 
 def _send_with_gmail_api(file_path: Path, kindle: dict, recipient: str) -> str:
@@ -87,27 +101,62 @@ def _send_with_gmail_api(file_path: Path, kindle: dict, recipient: str) -> str:
     except Exception as exc:
         return f"Kindle delivery skipped: Gmail OAuth failed. {exc}"
 
-    message = _build_message(file_path, sender, recipient)
+    message = _build_message(file_path, sender, recipient, is_text_only=False)
     encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
     service.users().messages().send(userId="me", body={"raw": encoded_message}).execute()
     return f"Sent {file_path.name} to {recipient} with Gmail API."
 
 
-def _build_message(file_path: Path, sender: str, recipient: str) -> EmailMessage:
+def _build_message(file_path: Path, sender: str, recipient: str, is_text_only: bool = False) -> EmailMessage:
     message = EmailMessage()
     message["Subject"] = file_path.stem
     message["From"] = sender
     message["To"] = recipient
-    message.set_content("Attached is your weekly media digest.")
-    content_type = mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
-    maintype, subtype = content_type.split("/", 1)
-    message.add_attachment(
-        file_path.read_bytes(),
-        maintype=maintype,
-        subtype=subtype,
-        filename=file_path.name,
-    )
+
+    if is_text_only:
+        md_path = file_path.with_suffix(".md")
+        if md_path.exists():
+            body_text = md_path.read_text(encoding="utf-8")
+        else:
+            body_text = "Weekly Digest Content"
+
+        message.set_content(body_text)
+        html_body = _markdown_to_html(body_text)
+        message.add_alternative(html_body, subtype="html")
+    else:
+        message.set_content("Attached is your weekly media digest.")
+        content_type = mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
+        maintype, subtype = content_type.split("/", 1)
+        message.add_attachment(
+            file_path.read_bytes(),
+            maintype=maintype,
+            subtype=subtype,
+            filename=file_path.name,
+        )
     return message
+
+
+def _markdown_to_html(md_text: str) -> str:
+    import re
+    html = md_text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    html = re.sub(r"^# (.*?)$", r'<h1 style="color:#111827;font-family:sans-serif;">\1</h1>', html, flags=re.M)
+    html = re.sub(r"^## (.*?)$", r'<h2 style="color:#1f2937;font-family:sans-serif;margin-top:20px;">\1</h2>', html, flags=re.M)
+    html = re.sub(r"^### (.*?)$", r'<h3 style="color:#374151;font-family:sans-serif;">\1</h3>', html, flags=re.M)
+    html = re.sub(r"\*\*(.*?)\*\*", r"<strong>\1</strong>", html)
+    html = re.sub(r"\[(.*?)\]\((https?://.*?)\)", r'<a href="\2" style="color:#2563eb;">\1</a>', html)
+    html = re.sub(r"^> (.*?)$", r'<blockquote style="border-left:4px solid #cbd5e1;padding-left:12px;color:#475569;">\1</blockquote>', html, flags=re.M)
+    html = re.sub(r"^- (.*?)$", r'<li style="margin-bottom:4px;">\1</li>', html, flags=re.M)
+    paragraphs = html.split("\n\n")
+    formatted = []
+    for p in paragraphs:
+        p = p.strip()
+        if not p:
+            continue
+        if p.startswith("<h") or p.startswith("<blockquote") or p.startswith("<li"):
+            formatted.append(p)
+        else:
+            formatted.append(f'<p style="font-family:sans-serif;font-size:15px;line-height:1.6;color:#334155;">{p.replace(chr(10), "<br>")}</p>')
+    return "\n".join(formatted)
 
 
 def _gmail_service(kindle: dict):
