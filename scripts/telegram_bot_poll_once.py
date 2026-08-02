@@ -16,6 +16,21 @@ def extract_urls(text: str) -> list[str]:
     pattern = r'(https?://[^\s]+)'
     return re.findall(pattern, text)
 
+def extract_urls_from_message(message: dict) -> list[str]:
+    urls = []
+    # Text and Caption fields
+    combined_text = (message.get("text") or "") + " " + (message.get("caption") or "")
+    if combined_text.strip():
+        urls.extend(extract_urls(combined_text))
+
+    # Formatted Hyperlink Entities
+    entities = (message.get("entities") or []) + (message.get("caption_entities") or [])
+    for entity in entities:
+        if isinstance(entity, dict) and entity.get("type") == "text_link" and entity.get("url"):
+            urls.append(entity["url"])
+
+    return list(dict.fromkeys(urls))
+
 def run_once():
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
     if not token:
@@ -42,6 +57,8 @@ def run_once():
         data = resp.json()
         new_links = []
         new_offset = offset
+        trigger_send = False
+
         for result in data.get("result", []):
             new_offset = result["update_id"] + 1
             message = (
@@ -50,11 +67,14 @@ def run_once():
                 or result.get("edited_message")
                 or result.get("edited_channel_post")
             )
-            if not message or "text" not in message:
+            if not message:
                 continue
+
+            raw_text = (message.get("text") or "") + " " + (message.get("caption") or "")
+            if "/send" in raw_text.lower() or "/ebook" in raw_text.lower():
+                trigger_send = True
             
-            text = message["text"].strip()
-            urls = extract_urls(text)
+            urls = extract_urls_from_message(message)
             if urls:
                 new_links.extend(urls)
         
@@ -90,6 +110,12 @@ def run_once():
                 print("No new unique links found.")
         else:
             print("No links found in updates.")
+
+        # If /send or /ebook was command was present in Telegram, process inbox immediately
+        if trigger_send:
+            print("🚀 '/send' command detected in Telegram! Triggering batch pipeline immediately...")
+            from process_inbox_batch import process_inbox_batch
+            process_inbox_batch(LINKS_PATH)
 
     except Exception as e:
         print(f"Error during Telegram update retrieval: {e}")
