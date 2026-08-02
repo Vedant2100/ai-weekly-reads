@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import base64
+import json
+import mimetypes
 import os
+import requests
 from pathlib import Path
 
 
@@ -13,21 +17,34 @@ def maybe_send_to_remarkable(file_path: Path) -> str:
         return f"reMarkable delivery skipped: File {file_path} does not exist."
 
     try:
-        from rmapy import api
-        from rmapy.api import Client
-        from rmapy.document import ZipDocument
+        # Step 1: Exchange Device Token for User Token
+        user_auth_url = "https://webapp.cloud.remarkable.com/token/json/2/user/new"
+        user_resp = requests.post(
+            user_auth_url,
+            headers={"Authorization": f"Bearer {device_token}"},
+            timeout=15,
+        )
+        user_resp.raise_for_status()
+        user_token = user_resp.text.strip()
 
-        api.USER_TOKEN_URL = "https://webapp.cloud.remarkable.com/token/json/2/user/new"
-        api.DEVICE_TOKEN_URL = "https://webapp.cloud.remarkable.com/token/json/2/device/new"
+        # Step 2: Upload File to reMarkable Cloud via WebLibrary API (/doc/v2/files)
+        upload_url = "https://internal.cloud.remarkable.com/doc/v2/files"
+        meta = json.dumps({"parent": "", "file_name": file_path.name})
+        meta_b64 = base64.b64encode(meta.encode("utf-8")).decode("utf-8")
 
-        client = Client()
-        client.token_set["devicetoken"] = device_token
-        client.renew_token()
+        content_type = mimetypes.guess_type(file_path.name)[0] or "application/epub+zip"
 
-        doc = ZipDocument(docpath=str(file_path))
-        if client.upload(doc):
-            return f"✅ Sent {file_path.name} to reMarkable Cloud successfully!"
-        else:
-            return f"Notice: reMarkable upload returned False for {file_path.name}."
+        headers = {
+            "Authorization": f"Bearer {user_token}",
+            "rm-source": "WebLibrary",
+            "rm-meta": meta_b64,
+            "Content-Type": content_type,
+        }
+
+        resp = requests.post(upload_url, headers=headers, data=file_path.read_bytes(), timeout=60)
+        resp.raise_for_status()
+        result = resp.json()
+        doc_id = result.get("docID", "unknown")
+        return f"✅ Successfully uploaded {file_path.name} (DocID: {doc_id}) to reMarkable Cloud!"
     except Exception as exc:
         return f"Notice: reMarkable delivery failed: {exc}"

@@ -28,6 +28,7 @@ def get_or_create_transcript(item: MediaItem, settings: Settings) -> tuple[Path 
             print(f"Downloading PDF: {item.url}")
             resp = requests.get(item.url, timeout=30, headers={"User-Agent": "AIWeeklyReads/0.1"})
             resp.raise_for_status()
+            RAW_TRANSCRIPTS.mkdir(parents=True, exist_ok=True)
             pdf_path.write_bytes(resp.content)
             return pdf_path, "pdf_download"
         except Exception as exc:
