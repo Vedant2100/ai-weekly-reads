@@ -21,19 +21,17 @@ GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send"
 
 def maybe_send_to_kindle(file_path: Path, settings: Settings, force: bool = False) -> str:
     kindle = settings.kindle
-    user_email = os.environ.get("USER_EMAIL") or os.environ.get("GMAIL_RECIPIENT")
-    kindle_enabled = kindle.get("enabled") or os.environ.get("KINDLE_ENABLED") == "true" or user_email
-
+    kindle_enabled = kindle.get("enabled") or os.environ.get("KINDLE_ENABLED") == "true"
     if not kindle_enabled:
-        return "Email delivery skipped: Email delivery disabled."
+        return "Kindle email delivery disabled."
 
     recipient = _configured_email(kindle, "kindle_email") or os.environ.get("KINDLE_EMAIL", "").strip()
-    if not recipient and not user_email:
-        return "Email delivery skipped: No recipient (kindle_email or USER_EMAIL) configured."
+    if not recipient:
+        return "Kindle delivery skipped: kindle.kindle_email is not configured."
 
-    delivery_key, file_hash = _delivery_key(file_path, recipient or user_email)
+    delivery_key, file_hash = _delivery_key(file_path, recipient)
     if not force and _already_sent(delivery_key):
-        return f"Email delivery skipped: {file_path.name} was already sent. Use --force to resend."
+        return f"Kindle delivery skipped: {file_path.name} was already sent to this Kindle address. Use --force to resend."
 
     delivery_method = str(kindle.get("delivery_method") or os.environ.get("KINDLE_DELIVERY_METHOD", "smtp")).strip().lower()
     if delivery_method in {"apple_mail", "mail", "macos_mail"}:
@@ -47,7 +45,7 @@ def maybe_send_to_kindle(file_path: Path, settings: Settings, force: bool = Fals
         return message
 
     message = _send_with_smtp(file_path, kindle, recipient)
-    _record_delivery_if_sent(message, delivery_key, file_hash, file_path, delivery_method, recipient or user_email)
+    _record_delivery_if_sent(message, delivery_key, file_hash, file_path, delivery_method, recipient)
     return message
 
 
@@ -65,30 +63,16 @@ def _send_with_smtp(file_path: Path, kindle: dict, recipient: str) -> str:
     if not password:
         missing.append("KINDLE_SMTP_PASSWORD")
     if missing:
-        return f"Email delivery skipped: missing {', '.join(missing)}."
+        return f"Kindle delivery skipped: missing {', '.join(missing)}."
 
-    recipients = [r.strip() for r in recipient.split(",") if r.strip()]
-    user_email = os.environ.get("USER_EMAIL") or os.environ.get("GMAIL_RECIPIENT")
+    message = _build_message(file_path, sender, recipient)
 
-    sent_to = []
     with smtplib.SMTP(smtp_host, smtp_port) as smtp:
         smtp.starttls()
         smtp.login(smtp_username, password)
+        smtp.send_message(message)
 
-        # Send Kindle attachment email (if Kindle recipient configured)
-        for target in recipients:
-            message = _build_message(file_path, sender, target, is_text_only=False)
-            smtp.send_message(message)
-            sent_to.append(f"{target} (Kindle attachment)")
-
-        # Send personal Gmail inline article text email (if USER_EMAIL configured)
-        if user_email and user_email.strip() not in recipients:
-            target_user = user_email.strip()
-            message = _build_message(file_path, sender, target_user, is_text_only=True)
-            smtp.send_message(message)
-            sent_to.append(f"{target_user} (Gmail text in body)")
-
-    return f"Sent {file_path.name} to {', '.join(sent_to)}."
+    return f"Sent {file_path.name} to {recipient}."
 
 
 def _send_with_gmail_api(file_path: Path, kindle: dict, recipient: str) -> str:
@@ -105,62 +89,27 @@ def _send_with_gmail_api(file_path: Path, kindle: dict, recipient: str) -> str:
     except Exception as exc:
         return f"Kindle delivery skipped: Gmail OAuth failed. {exc}"
 
-    message = _build_message(file_path, sender, recipient, is_text_only=False)
+    message = _build_message(file_path, sender, recipient)
     encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
     service.users().messages().send(userId="me", body={"raw": encoded_message}).execute()
     return f"Sent {file_path.name} to {recipient} with Gmail API."
 
 
-def _build_message(file_path: Path, sender: str, recipient: str, is_text_only: bool = False) -> EmailMessage:
+def _build_message(file_path: Path, sender: str, recipient: str) -> EmailMessage:
     message = EmailMessage()
     message["Subject"] = file_path.stem
     message["From"] = sender
     message["To"] = recipient
-
-    if is_text_only:
-        md_path = file_path.with_suffix(".md")
-        if md_path.exists():
-            body_text = md_path.read_text(encoding="utf-8")
-        else:
-            body_text = "Weekly Digest Content"
-
-        message.set_content(body_text)
-        html_body = _markdown_to_html(body_text)
-        message.add_alternative(html_body, subtype="html")
-    else:
-        message.set_content("Attached is your weekly media digest.")
-        content_type = mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
-        maintype, subtype = content_type.split("/", 1)
-        message.add_attachment(
-            file_path.read_bytes(),
-            maintype=maintype,
-            subtype=subtype,
-            filename=file_path.name,
-        )
+    message.set_content("Attached is your weekly media digest.")
+    content_type = mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
+    maintype, subtype = content_type.split("/", 1)
+    message.add_attachment(
+        file_path.read_bytes(),
+        maintype=maintype,
+        subtype=subtype,
+        filename=file_path.name,
+    )
     return message
-
-
-def _markdown_to_html(md_text: str) -> str:
-    import re
-    html = md_text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    html = re.sub(r"^# (.*?)$", r'<h1 style="color:#111827;font-family:sans-serif;">\1</h1>', html, flags=re.M)
-    html = re.sub(r"^## (.*?)$", r'<h2 style="color:#1f2937;font-family:sans-serif;margin-top:20px;">\1</h2>', html, flags=re.M)
-    html = re.sub(r"^### (.*?)$", r'<h3 style="color:#374151;font-family:sans-serif;">\1</h3>', html, flags=re.M)
-    html = re.sub(r"\*\*(.*?)\*\*", r"<strong>\1</strong>", html)
-    html = re.sub(r"\[(.*?)\]\((https?://.*?)\)", r'<a href="\2" style="color:#2563eb;">\1</a>', html)
-    html = re.sub(r"^> (.*?)$", r'<blockquote style="border-left:4px solid #cbd5e1;padding-left:12px;color:#475569;">\1</blockquote>', html, flags=re.M)
-    html = re.sub(r"^- (.*?)$", r'<li style="margin-bottom:4px;">\1</li>', html, flags=re.M)
-    paragraphs = html.split("\n\n")
-    formatted = []
-    for p in paragraphs:
-        p = p.strip()
-        if not p:
-            continue
-        if p.startswith("<h") or p.startswith("<blockquote") or p.startswith("<li"):
-            formatted.append(p)
-        else:
-            formatted.append(f'<p style="font-family:sans-serif;font-size:15px;line-height:1.6;color:#334155;">{p.replace(chr(10), "<br>")}</p>')
-    return "\n".join(formatted)
 
 
 def _gmail_service(kindle: dict):
