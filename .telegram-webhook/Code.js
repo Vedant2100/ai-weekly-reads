@@ -141,28 +141,3 @@ function authorizeResearchDelivery() {
   }
   return recipient || "No recipient found; set RESEARCH_EMAIL_TO in Script properties.";
 }
-
-// Temporary editor-only delivery test. Removed after verification.
-function testResearchDelivery() {
-  var properties = PropertiesService.getScriptProperties();
-  var secret = properties.getProperty("RESEARCH_DIGEST_SECRET")
-    || properties.getProperty("GITHUB_PAT");
-  var now = new Date().toISOString();
-
-  return handleResearchDigest({
-    secret: secret,
-    subject: "AI Weekly Reads delivery test",
-    body: "The live AI Weekly email and Google Sheets delivery path passed.",
-    html_body: "<p><strong>AI Weekly Reads delivery test passed.</strong></p><p>The live email and Google Sheets delivery path passed.</p>",
-    rows: [{
-      captured_at: now,
-      processed_at: now,
-      type: "link",
-      title: "Codex end-to-end delivery test",
-      url: "https://example.com/codex-e2e-test",
-      source: "codex-e2e",
-      summary_status: "e2e_test",
-      digest_date: now.substring(0, 10)
-    }]
-  });
-}
