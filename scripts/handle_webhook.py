@@ -55,6 +55,13 @@ def main():
         print("No message found in payload.")
         sys.exit(0)
 
+    # Security Check: Only allow messages from the authorized user
+    AUTHORIZED_USER_ID = 8370406344
+    sender_id = message.get("from", {}).get("id")
+    if sender_id != AUTHORIZED_USER_ID:
+        print(f"SECURITY ALERT: Unauthorized access attempt from Telegram User ID: {sender_id}. Ignoring message.")
+        sys.exit(0)
+
     # Extract links
     urls = extract_urls_from_message(message)
     
