@@ -47,51 +47,6 @@ function doPost(e) {
   return ContentService.createTextOutput("OK");
 }
 
-// Temporary, token-gated end-to-end probe. Removed after verification.
-var CODEX_E2E_TOKEN_SHA256 = "6c7ed13615cd96ea2e2d5cf4b6a2982702e76ea67c036c6dc83f96d0ba6bc0ec";
-
-function doGet(e) {
-  if (!codexE2EAuthorized_(e && e.parameter && e.parameter.token)) {
-    return jsonResponse({ok: false, error: "unauthorized"});
-  }
-
-  var properties = PropertiesService.getScriptProperties();
-  var secret = properties.getProperty("RESEARCH_DIGEST_SECRET")
-    || properties.getProperty("GITHUB_PAT");
-  var now = new Date().toISOString();
-
-  return handleResearchDigest({
-    action: "research_digest",
-    secret: secret,
-    subject: "AI Weekly Reads end-to-end test",
-    body: "The live AI Weekly email and Google Sheets delivery path completed successfully.",
-    html_body: "<p><strong>AI Weekly Reads end-to-end test passed.</strong></p><p>The live email and Google Sheets delivery path completed successfully.</p>",
-    rows: [{
-      captured_at: now,
-      processed_at: now,
-      type: "link",
-      title: "Codex end-to-end delivery test",
-      url: "https://example.com/codex-e2e-test",
-      source: "codex-e2e",
-      summary_status: "e2e_test",
-      digest_date: now.substring(0, 10)
-    }]
-  });
-}
-
-function codexE2EAuthorized_(token) {
-  var digest = Utilities.computeDigest(
-    Utilities.DigestAlgorithm.SHA_256,
-    String(token || ""),
-    Utilities.Charset.UTF_8
-  );
-  var hex = digest.map(function(byte) {
-    var value = byte < 0 ? byte + 256 : byte;
-    return ("0" + value.toString(16)).slice(-2);
-  }).join("");
-  return hex === CODEX_E2E_TOKEN_SHA256;
-}
-
 function handleResearchDigest(payload) {
   var properties = PropertiesService.getScriptProperties();
   var expectedSecret = properties.getProperty("RESEARCH_DIGEST_SECRET") || properties.getProperty("GITHUB_PAT");
