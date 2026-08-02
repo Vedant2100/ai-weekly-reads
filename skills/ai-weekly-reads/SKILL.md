@@ -12,7 +12,9 @@ Work from the AI Weekly Reads repository root.
 - `config/sources.json` is the recurring source registry.
 - `config/settings.example.json` is the shareable settings template; local `config/settings.json` is ignored by Git.
 - `inbox/links.example.txt` is the shareable inbox template; local `inbox/links.txt` is ignored by Git.
-- `inbox/links.txt` is for one-off links collected during the week.
+- `inbox/links.txt` is the persistent Telegram research queue.
+- `inbox/link_capture.jsonl` records capture timestamps and Telegram message metadata.
+- `inbox/research_state.json` stores the three-day checkpoint, prior digest context, and Google Sheet ID.
 - `knowledge_base/raw_transcripts/` is the canonical local raw transcript/text store.
 - `knowledge_base/resources/` is the canonical local clean reading-note store.
 - `knowledge_base/weekly_books/` stores local Markdown weekly books for Obsidian.
@@ -24,11 +26,11 @@ Work from the AI Weekly Reads repository root.
 - `one-shot/latest.md` is the public, tracked, summaries-only one-shot playlist book. Each one-shot playlist build overwrites it.
 - `one-shot/latest.epub` is the public tracked EPUB companion for the latest one-shot playlist build when EPUB generation is available.
 - `output/` is disposable build output, temporary media/summary scratch, and last-run metadata.
-- `assets/kindle.css` is the EPUB reading stylesheet. Keep the page pure white with black text and avoid shaded content blocks that reduce Kindle contrast.
+- `assets/kindle.css` is retained for the paused legacy EPUB path. Keep the page pure white with black text if Kindle is re-enabled.
 - Generated Obsidian notes should use Properties-friendly YAML. Keep note type, source, status, priority, and language as Properties. Only resource notes should have tags, using 2-4 controlled `topic/...` values for central subject matter; do not create operational tags.
 - Resource notes should store principal guests or speakers in the `speakers` property. Kindle metadata should display the human-readable podcast/channel name as the link label and never print a bare source URL.
 - Generated knowledge-base notes, local settings, and inbox links are local-only and ignored by Git. Keep workflow code, prompts, shareable config, and templates in Git; do not re-add generated/private files unless the user explicitly asks.
-- GitHub Actions is for lightweight repo health only. Do not turn it into the primary content runner unless the user explicitly chooses cloud-hosted knowledge-base state and GitHub secrets for delivery.
+- GitHub Actions captures Telegram links and runs the three-day research email workflow using configured secrets. Keep private credentials out of the repository.
 - Do not recreate a durable `data/` folder.
 
 ## Weekly Discovery

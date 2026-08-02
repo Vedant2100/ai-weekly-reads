@@ -13,7 +13,7 @@ from sources import read_inbox
 
 def watch_inbox(inbox_path: Path = INBOX / "links.txt", poll_interval: int = 10):
     print(f"👀 Watching {inbox_path} for new links (polling every {poll_interval}s)...")
-    print("Drop any link (PDF, X thread, YouTube, article) into the file to generate your ebook!")
+    print("Drop any link (PDF, X thread, YouTube, article) into the file for a research email digest.")
     print("Press Ctrl+C to stop.")
 
     while True:

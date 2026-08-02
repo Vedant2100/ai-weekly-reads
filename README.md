@@ -1,6 +1,6 @@
 # AI Weekly Reads
 
-AI Weekly Reads turns AI videos and podcasts into a weekly reading edition for Substack, Kindle, GitHub, and a local Obsidian knowledge base.
+AI Weekly Reads turns a high-volume Telegram link stream into a research reorientation digest. It keeps the links, handles YouTube/PDF/web sources, summarizes them around what was already known and what each source adds, and sends the result by email every three days.
 
 ## Read It
 
@@ -19,12 +19,13 @@ The public GitHub edition is intentionally rolling:
 - Weekly runs replace `weekly/latest.md` and `weekly/latest.epub`.
 - One-shot playlist runs replace `one-shot/latest.md` and `one-shot/latest.epub`.
 
-The key design choice is:
+The active delivery path is:
 
-- **Generation:** build Markdown/EPUB/public files from source material
-- **Distribution:** optionally send/publish those files to your own channels
+- **Capture:** send links to Telegram; the webhook appends them to `inbox/links.txt` and `inbox/link_capture.jsonl`
+- **Reorientation:** the scheduled runner summarizes each queued source and synthesizes it against prior digest context
+- **Delivery:** the runner emails one research digest and appends one typed row per link to Google Sheets
 
-The repository defaults to generation first. Personal delivery is explicit.
+Kindle ebook delivery is paused. The older EPUB/Kindle builders remain available for later, but no active workflow invokes them.
 
 ## What Gets Covered
 
@@ -58,24 +59,21 @@ One-off links can also be added to `inbox/links.txt`, and one-shot YouTube playl
 
 ```mermaid
 flowchart TD
-    A["Recurring sources\nYouTube channels + podcast RSS"] --> C["Discovery\nconfig/sources.json + inbox/links.txt"]
-    B["One-off links\nvideos, playlists, episode pages"] --> C
-    C --> D["Resolve items\nstable IDs + publication dates"]
-    D --> E["Transcript layer\npublisher text, captions, Mistral transcription fallback"]
-    E --> F["Mistral summaries\nresource notes with speakers, topics, priority"]
-    F --> G["Local knowledge base\nknowledge_base/resources + raw_transcripts"]
-    G --> H["Weekly digest\nMarkdown + EPUB"]
-    H --> I["Substack export\noutput/substack/latest.md"]
-    H --> J["Optional delivery\nKindle email + Substack browser publish"]
-    H --> K["GitHub latest\nlatest.* plus weekly/latest.* or one-shot/latest.*"]
-    G --> L["Obsidian graph\nresources connected to topic hubs"]
+    A["Telegram links"] --> C["Persistent inbox\nlinks.txt + capture log"]
+    C --> D["Every-three-day runner"]
+    D --> E["Resolve + extract\nYouTube, PDF, web, podcast"]
+    E --> F["Research summaries\nbaseline, contribution, caveats"]
+    F --> G["Batch reorientation\nprior digest context + current links"]
+    G --> H["Email digest"]
+    F --> I["Append-only Google Sheet\ntype, title, URL, status"]
+    F --> J["Local knowledge base\nresources + raw_transcripts"]
 ```
 
 The project is local-first. Raw transcripts, resource notes, generated EPUBs, private settings, browser sessions, and delivery ledgers are ignored by Git. The repository stores the workflow, prompts, source registry, and the current rolling public editions.
 
 ## How YouTube And Podcasts Are Processed
 
-After discovery, every item goes through the same shared pipeline: stable ID, publication-date filtering, transcript lookup, summary generation, resource-note write, weekly digest build, and optional distribution. The only real difference is how discovery and transcript collection work at the front of the pipeline.
+After capture, every queued item goes through the same research pipeline: stable ID, source resolution, transcript/PDF extraction, research-oriented summary, resource-note write, batch reorientation, email delivery, and Google Sheets append. The queue is only cleared after the email succeeds.
 
 ### YouTube
 
@@ -95,7 +93,7 @@ After discovery, every item goes through the same shared pipeline: stable ID, pu
 5. If no publisher transcript is present and Mistral transcription is enabled, it tries the remote audio URL directly, then falls back to downloading the media file and transcribing that file.
 6. The transcript is stored locally, summarized, and written into the weekly outputs.
 
-The summary and output stage is identical after that point. Both source types end up as local resource notes in `knowledge_base/resources/`, raw transcript notes in `knowledge_base/raw_transcripts/`, a top-level public Markdown/EPUB pair in `latest.md` and `latest.epub`, a category-specific public Markdown digest in `weekly/latest.md` for weekly runs or `one-shot/latest.md` for playlist runs, a matching category-specific EPUB when available, and a Substack-ready export in `output/substack/latest.md`.
+YouTube captions, publisher text, and PDFs are stored in the local knowledge base. Each summary explicitly covers `What Came Before`, `What This Adds`, `Why It Matters`, and `What To Watch`. The batch email reorients the current links against both recent digest state and the accumulated Obsidian resource notes, without sending raw transcripts into the synthesis prompt.
 
 ## Outputs
 
@@ -111,66 +109,29 @@ The summary and output stage is identical after that point. Both source types en
 - `knowledge_base/resources/`: local clean reading notes for Obsidian
 - `knowledge_base/raw_transcripts/`: local raw transcript/text archive
 
-## Weekly Run
+## Research Digest Run
 
-The default weekly command builds artifacts only:
-
-```bash
-.venv/bin/python scripts/build_weekly_digest.py
-```
-
-It does all of the following:
-
-1. Fetches recurring sources and inbox links.
-2. Filters recurring sources to the last `publication_window_days` days.
-3. Reuses already-summarized resources.
-4. Transcribes and summarizes new items when needed.
-5. Builds the weekly digest.
-6. Writes `latest.md` and `weekly/latest.md`.
-7. Writes `latest.epub` and `weekly/latest.epub` when an EPUB is available.
-8. Writes `output/substack/latest.md`.
-
-It does **not** email Kindle or publish to Substack by default.
-
-### Build-Only Commands
+The active runner checks the queue and sends only when the three-day interval is due:
 
 ```bash
-.venv/bin/python scripts/build_weekly_digest.py
-.venv/bin/python scripts/build_latest_digest.py
-.venv/bin/python scripts/build_substack_post.py --force
+.venv/bin/python scripts/research_digest.py
 ```
 
-### Optional Distribution
-
-Use explicit follow-up commands when you want personal delivery or browser-based publishing:
+For a manual test/send:
 
 ```bash
-.venv/bin/python scripts/send_latest_to_kindle.py
-.venv/bin/python scripts/send_latest_to_kindle.py --force
-PLAYWRIGHT_BROWSERS_PATH=.venv-substack/ms-playwright .venv-substack/bin/python scripts/create_substack_draft.py
-PLAYWRIGHT_BROWSERS_PATH=.venv-substack/ms-playwright .venv-substack/bin/python scripts/create_substack_draft.py --publish
+.venv/bin/python scripts/research_digest.py --force
 ```
 
-If you want one command that builds and then sends to Kindle, use:
+The Codex project automation runs this every three days. The persisted state in `inbox/research_state.json` is an additional safety guard. GitHub's digest workflow is manual-only to prevent duplicate emails; Telegram capture still uses GitHub and the automation pulls those commits before processing. Links remain queued if email or Google Sheets delivery fails.
+
+### Legacy Builders
 
 ```bash
-.venv/bin/python scripts/build_weekly_digest.py --send-kindle
-.venv/bin/python scripts/build_latest_digest.py --send-kindle
+.venv/bin/python scripts/process_inbox_batch.py
 ```
 
-Process a one-shot YouTube playlist:
-
-```bash
-.venv/bin/python scripts/build_playlist_digest.py "https://www.youtube.com/playlist?list=PLAYLIST_ID" --send-kindle --substack
-```
-
-That command also refreshes the rolling public one-shot artifacts at `one-shot/latest.md` and `one-shot/latest.epub`, and it updates the top-level `latest.md` and `latest.epub` pointers to that one-shot edition.
-
-Publish the latest Substack post with the saved browser profile:
-
-```bash
-PLAYWRIGHT_BROWSERS_PATH=.venv-substack/ms-playwright .venv-substack/bin/python scripts/create_substack_draft.py --publish
-```
+The old EPUB, Kindle, playlist, and Substack commands remain for backward compatibility but are not part of the active Telegram workflow.
 
 ## Setup
 
@@ -181,7 +142,7 @@ python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 ```
 
-EPUB generation additionally requires the external `pandoc` binary (for example `brew install pandoc` on macOS). Without it, builds still produce Markdown output.
+The active email workflow does not require Pandoc. EPUB generation is only needed for the paused legacy Kindle path.
 
 ## Configuration
 
@@ -197,15 +158,19 @@ Local-only files:
 
 - `config/settings.json`: personal settings
 - `.env`: API keys and delivery settings
-- `inbox/links.txt`: one-off weekly links
-- `config/private/`: Gmail OAuth tokens and Substack browser profile
+- `inbox/links.txt`: queued Telegram research links
+- `inbox/link_capture.jsonl`: append-only Telegram capture metadata
+- `inbox/archive.txt`: successfully emailed links
+- `config/private/`: Google OAuth tokens and Substack browser profile
 
 Important settings in `config/settings.json`:
 
-- `publication_window_days`: how many days count as the current weekly window
-- `weekly_resource_limit`: maximum resources in the weekly book
+- `email`: recipient, sender, and Gmail API/SMTP delivery settings
+- `google_sheets`: append-only sheet settings; if no spreadsheet ID is supplied, the first run creates one and persists its ID in `inbox/research_state.json`
+- `publication_window_days`: legacy recurring-source window
+- `weekly_resource_limit`: legacy weekly-book limit
 - `max_items_per_run`: optional cost/safety cap; `0` means no cap
-- `kindle_output_format`: `epub` or `markdown`
+- `kindle.enabled`: leave false while email is the active delivery path
 
 Per-source settings in `config/sources.json`:
 
@@ -227,26 +192,42 @@ Default models are configured in `config/settings.json`:
 - fallback summaries: `mistral-medium-latest` when a batch job fails or returns unusable structured summaries
 - transcription: configurable in `config/settings.json`
 
-### Kindle
+### Email
 
-Kindle delivery is local and private. Keep these in `.env`:
-
-```bash
-KINDLE_ENABLED=true
-KINDLE_DELIVERY_METHOD=gmail_api
-KINDLE_EMAIL=yourname_123@kindle.com
-KINDLE_SENDER_EMAIL=your.gmail.address@gmail.com
-GMAIL_CREDENTIALS_PATH=config/private/gmail_credentials.json
-GMAIL_TOKEN_PATH=config/private/gmail_token.json
-```
-
-Set up Gmail OAuth once:
+Set these values for the active research delivery path:
 
 ```bash
-.venv/bin/python scripts/setup_gmail_oauth.py
+EMAIL_ENABLED=true
+EMAIL_DELIVERY_METHOD=smtp
+EMAIL_RECIPIENT=you@example.com
+EMAIL_SENDER=you@example.com
+EMAIL_SMTP_HOST=smtp.gmail.com
+EMAIL_SMTP_PORT=587
+EMAIL_SMTP_USERNAME=you@example.com
+EMAIL_SMTP_PASSWORD=your-app-password
 ```
 
-Successful sends are recorded in `output/_metadata/kindle_delivery.json` so the same file is not resent accidentally.
+Gmail API delivery is also supported. Set `EMAIL_DELIVERY_METHOD=gmail_api`, configure `GOOGLE_CREDENTIALS_PATH` and `GOOGLE_TOKEN_PATH`, then authorize once:
+
+```bash
+.venv/bin/python scripts/setup_google_oauth.py
+```
+
+### Google Sheets
+
+Enable the append-only link index with:
+
+```bash
+GOOGLE_SHEETS_ENABLED=true
+GOOGLE_SHEETS_SPREADSHEET_ID=optional-existing-sheet-id
+GOOGLE_SHEETS_WORKSHEET=Links
+```
+
+The OAuth token must include both Gmail send and Google Sheets scopes. If no spreadsheet ID is supplied, the first successful run creates `AI Research Link Library`, records its URL in `inbox/research_state.json`, and appends future rows to it. Each row records capture time, type (`yt`, `pdf`, `link`, `podcast`, or `x`), title, URL, source, publication date, extraction method, summary status, and digest date.
+
+For the local Codex automation, keep the Google client/token files under `config/private/`. For the optional manual GitHub workflow, provide `GOOGLE_CREDENTIALS_JSON` and `GOOGLE_TOKEN_JSON` secrets plus the email and sheet secrets used by `.github/workflows/process_inbox.yml`.
+
+Kindle delivery is disabled in the active workflows. Do not set `KINDLE_ENABLED=true` unless you intentionally restore that path.
 
 ### Substack
 
@@ -284,14 +265,17 @@ The generated graph preset hides storage details such as raw transcripts, source
 - `config/sources.json`: recurring source registry
 - `config/settings.example.json`: shareable settings template
 - `inbox/links.example.txt`: shareable inbox template
-- `scripts/pipeline.py`: shared update/build/send workflow
-- `scripts/build_weekly_digest.py`: weekly runner
+- `scripts/research_digest.py`: three-day research email runner
+- `scripts/research_delivery.py`: email and Google Sheets delivery
+- `scripts/handle_webhook.py`: Telegram link capture
+- `scripts/setup_google_oauth.py`: combined Gmail/Sheets OAuth setup
+- `scripts/pipeline.py`: legacy weekly update/build/send workflow
 - `scripts/build_playlist_digest.py`: one-shot YouTube playlist runner
 - `scripts/create_substack_draft.py`: Substack browser draft/publish automation
-- `scripts/send_to_kindle.py`: Kindle delivery
+- `scripts/send_to_kindle.py`: paused legacy Kindle delivery
 - `scripts/resources.py`: resource note writer
 - `scripts/digest.py`: weekly book builder
-- `prompts/`: Mistral summary prompts
+- `prompts/`: research summary and batch reorientation prompts
 - `assets/kindle.css`: Kindle EPUB stylesheet
 
 ## Maintenance
@@ -310,4 +294,4 @@ Normalize Obsidian metadata after hand edits or migrations:
 .venv/bin/python scripts/normalize_knowledge_base.py
 ```
 
-GitHub Actions only runs lightweight repository health checks. It does not fetch media, call Mistral, transcribe audio, publish Substack posts, or send Kindle email.
+GitHub Actions captures Telegram links and runs the three-day research email workflow. It also maintains the queue/archive state. Kindle delivery is not invoked.

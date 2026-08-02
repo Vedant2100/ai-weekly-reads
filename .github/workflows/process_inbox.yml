@@ -1,19 +1,20 @@
 
 
-name: Process Inbox & Generate Ebook
+name: Research Reorientation Digest
 
 on:
   workflow_dispatch:
-  schedule:
-    # Run automatically every day at 10:00 AM PT (17:00 UTC)
-    - cron: "0 17 * * *"
 
 permissions:
   contents: write
 
+concurrency:
+  group: ai-research-inbox
+  cancel-in-progress: false
+
 jobs:
-  generate-ebook:
-    name: Generate Categorized AI Ebook
+  research-digest:
+    name: Send Research Email Digest
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
 
@@ -27,56 +28,47 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Install system dependencies (Pandoc & Typst)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y pandoc
-          curl -sL https://github.com/typst/typst/releases/latest/download/typst-x86_64-unknown-linux-musl.tar.xz | tar -xJ
-          sudo mv typst-x86_64-unknown-linux-musl/typst /usr/local/bin/
-
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
 
-      - name: Process Inbox & Build Ebook
+      - name: Send research digest
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           YTDLP_COOKIES_TXT: ${{ secrets.YTDLP_COOKIES_TXT }}
-          KINDLE_ENABLED: "true"
-
-          KINDLE_DELIVERY_METHOD: "smtp"
-          KINDLE_EMAIL: ${{ secrets.KINDLE_EMAIL }}
-          KINDLE_SENDER_EMAIL: ${{ secrets.KINDLE_SENDER_EMAIL }}
-          KINDLE_SMTP_HOST: ${{ secrets.KINDLE_SMTP_HOST }}
-          KINDLE_SMTP_PORT: ${{ secrets.KINDLE_SMTP_PORT }}
-          KINDLE_SMTP_USERNAME: ${{ secrets.KINDLE_SMTP_USERNAME }}
-          KINDLE_SMTP_PASSWORD: ${{ secrets.KINDLE_SMTP_PASSWORD }}
-          REMARKABLE_DEVICE_TOKEN: ${{ secrets.REMARKABLE_DEVICE_TOKEN }}
+          EMAIL_ENABLED: "true"
+          EMAIL_DELIVERY_METHOD: "smtp"
+          EMAIL_RECIPIENT: ${{ secrets.RESEARCH_EMAIL_TO }}
+          EMAIL_SENDER: ${{ secrets.RESEARCH_EMAIL_FROM }}
+          EMAIL_SMTP_HOST: ${{ secrets.EMAIL_SMTP_HOST }}
+          EMAIL_SMTP_PORT: ${{ secrets.EMAIL_SMTP_PORT }}
+          EMAIL_SMTP_USERNAME: ${{ secrets.EMAIL_SMTP_USERNAME }}
+          EMAIL_SMTP_PASSWORD: ${{ secrets.EMAIL_SMTP_PASSWORD }}
+          GOOGLE_SHEETS_ENABLED: ${{ secrets.GOOGLE_SHEETS_ENABLED }}
+          GOOGLE_SHEETS_SPREADSHEET_ID: ${{ secrets.GOOGLE_SHEETS_SPREADSHEET_ID }}
+          GOOGLE_SHEETS_WORKSHEET: ${{ secrets.GOOGLE_SHEETS_WORKSHEET }}
+          GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+          GOOGLE_TOKEN_JSON: ${{ secrets.GOOGLE_TOKEN_JSON }}
         run: |
-          python scripts/process_inbox_batch.py
+          if [ -n "$GOOGLE_CREDENTIALS_JSON" ] && [ -n "$GOOGLE_TOKEN_JSON" ]; then
+            mkdir -p config/private
+            printf '%s' "$GOOGLE_CREDENTIALS_JSON" > config/private/google_credentials.json
+            printf '%s' "$GOOGLE_TOKEN_JSON" > config/private/google_token.json
+          fi
+          python scripts/research_digest.py || test $? -eq 1
 
-      - name: Upload EPUB Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ai-weekly-reads-ebook
-          path: output/*.epub
-          if-no-files-found: ignore
-
-
-
-      - name: Commit and push generated notes & ebook
+      - name: Commit queue, archive, and research state
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add inbox/links.txt || true
           git add inbox/archive.txt || true
-          git add weekly/latest.md || true
-          git add latest.md || true
+          git add inbox/link_capture.jsonl || true
+          git add inbox/research_state.json || true
           if git diff --staged --quiet; then
             echo "No new summaries or ebooks generated."
           else
-            git commit -m "🤖 Auto-generate weekly ebook & summaries [skip ci]"
+            git commit -m "🤖 Send research reorientation digest [skip ci]"
             git push
           fi
-

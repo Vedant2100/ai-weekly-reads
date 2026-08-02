@@ -28,6 +28,8 @@ class Settings:
     follow_builders: dict[str, Any]
     kindle: dict[str, Any]
     substack: dict[str, Any]
+    email: dict[str, Any]
+    google_sheets: dict[str, Any]
     feeds: list[str]
 
 
@@ -56,6 +58,8 @@ def load_settings(path: Path | None = None) -> Settings:
         follow_builders=_follow_builders_settings(raw.get("follow_builders", {})),
         kindle=_kindle_settings(raw.get("kindle", {})),
         substack=_substack_settings(raw.get("substack", {})),
+        email=_email_settings(raw.get("email", {})),
+        google_sheets=_google_sheets_settings(raw.get("google_sheets", {})),
         feeds=list(raw.get("feeds", [])),
     )
 
@@ -103,6 +107,58 @@ def _substack_settings(raw: dict[str, Any] | None) -> dict[str, Any]:
     _set_env_value(substack, "browser_user_data_dir", "SUBSTACK_BROWSER_USER_DATA_DIR")
     _set_env_value(substack, "compose_url", "SUBSTACK_COMPOSE_URL")
     return substack
+
+
+def _email_settings(raw: dict[str, Any] | None) -> dict[str, Any]:
+    email = {
+        "enabled": False,
+        "delivery_method": "gmail_api",
+        "recipient_email": "",
+        "sender_email": "",
+        "subject_prefix": "AI Research Reorientation",
+        "gmail_credentials_path": "config/private/google_credentials.json",
+        "gmail_token_path": "config/private/google_token.json",
+        "smtp_host": "smtp.gmail.com",
+        "smtp_port": 587,
+        "smtp_username": "",
+        "smtp_password_env": "EMAIL_SMTP_PASSWORD",
+        **dict(raw or {}),
+    }
+    _set_env_value(email, "enabled", "EMAIL_ENABLED", transform=_as_bool)
+    _set_env_value(email, "delivery_method", "EMAIL_DELIVERY_METHOD")
+    _set_env_value(email, "recipient_email", "EMAIL_RECIPIENT")
+    _set_env_value(email, "recipient_email", "RESEARCH_EMAIL_TO")
+    _set_env_value(email, "sender_email", "EMAIL_SENDER")
+    _set_env_value(email, "sender_email", "RESEARCH_EMAIL_FROM")
+    _set_env_value(email, "subject_prefix", "EMAIL_SUBJECT_PREFIX")
+    _set_env_value(email, "gmail_credentials_path", "GOOGLE_CREDENTIALS_PATH")
+    _set_env_value(email, "gmail_token_path", "GOOGLE_TOKEN_PATH")
+    _set_env_value(email, "smtp_host", "EMAIL_SMTP_HOST")
+    _set_env_value(email, "smtp_port", "EMAIL_SMTP_PORT", transform=int)
+    _set_env_value(email, "smtp_username", "EMAIL_SMTP_USERNAME")
+    _set_env_value(email, "smtp_password_env", "EMAIL_SMTP_PASSWORD_ENV")
+    return email
+
+
+def _google_sheets_settings(raw: dict[str, Any] | None) -> dict[str, Any]:
+    sheets = {
+        "enabled": False,
+        "spreadsheet_id": "",
+        "worksheet_name": "Links",
+        "title": "AI Research Link Library",
+        "share_with_email": "",
+        "credentials_path": "config/private/google_credentials.json",
+        "token_path": "config/private/google_token.json",
+        **dict(raw or {}),
+    }
+    _set_env_value(sheets, "enabled", "GOOGLE_SHEETS_ENABLED", transform=_as_bool)
+    _set_env_value(sheets, "spreadsheet_id", "GOOGLE_SHEETS_SPREADSHEET_ID")
+    _set_env_value(sheets, "worksheet_name", "GOOGLE_SHEETS_WORKSHEET")
+    _set_env_value(sheets, "title", "GOOGLE_SHEETS_TITLE")
+    _set_env_value(sheets, "share_with_email", "GOOGLE_SHEETS_SHARE_WITH")
+    _set_env_value(sheets, "credentials_path", "GOOGLE_CREDENTIALS_PATH")
+    _set_env_value(sheets, "token_path", "GOOGLE_TOKEN_PATH")
+    return sheets
 
 
 def _set_env_value(kindle: dict[str, Any], key: str, env_name: str, transform=None) -> None:

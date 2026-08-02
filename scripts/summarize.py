@@ -46,6 +46,7 @@ Original link: {url}
 REQUIRED_SUMMARY_HEADINGS = (
     "## One-Sentence Takeaway",
     "## Short Summary",
+    "## Research Reorientation",
     "## Featured Speakers",
     "## Topics",
     "## Main Ideas",
@@ -55,6 +56,7 @@ REQUIRED_SUMMARY_HEADINGS = (
     "## People, Companies, Tools, And Links Mentioned",
     "## Reading Priority",
 )
+SUMMARY_PROMPT_VERSION = "summary-prompt-version: research-reorientation-v1"
 
 
 def get_or_create_summary(item: MediaItem, transcript_path: Path, settings: Settings) -> Path:
@@ -97,6 +99,8 @@ def should_refresh_summary(summary_path: Path, settings: Settings) -> bool:
         return True
     summary = read_text(summary_path)
     has_key = bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("MISTRAL_API_KEY"))
+    if has_key and SUMMARY_PROMPT_VERSION not in summary:
+        return True
     if has_key and is_placeholder_summary(summary):
         return True
     # Detect hollow summaries where Gemini returned empty sections
@@ -165,6 +169,9 @@ def _mistral_summary(item: MediaItem, transcript: str, settings: Settings) -> st
         response.raise_for_status()
         payload = response.json()
         content = payload["choices"][0]["message"]["content"]
+        issue = summary_quality_issue(content)
+        if issue:
+            raise RuntimeError(f"Mistral response failed summary quality checks: {issue}")
         return format_ai_summary(item, content)
     except Exception as exc:
         return _local_summary(item, transcript, settings, note=f"Mistral summary failed: {exc}")
@@ -213,7 +220,7 @@ def mistral_chat_payload(item: MediaItem, transcript: str, settings: Settings) -
 
 def format_ai_summary(item: MediaItem, content: str) -> str:
     content = strip_ai_response_wrappers(content)
-    return f"# {item.title}\n\nSource: {item.source_type}\nOriginal link: {item.url}\n\n{content.strip()}\n"
+    return f"# {item.title}\n\n<!-- {SUMMARY_PROMPT_VERSION} -->\nSource: {item.source_type}\nOriginal link: {item.url}\n\n{content.strip()}\n"
 
 
 def strip_ai_response_wrappers(content: str) -> str:
@@ -231,12 +238,45 @@ def strip_ai_response_wrappers(content: str) -> str:
 
 def summary_quality_issue(content: str) -> str | None:
     stripped = strip_ai_response_wrappers(content)
-    if len(stripped.split()) < 80:
+    if len(stripped.split()) < 140:
         return "summary is unexpectedly short"
     missing = [heading for heading in REQUIRED_SUMMARY_HEADINGS if heading not in stripped]
     if missing:
         return f"missing required headings: {', '.join(missing)}"
+    empty = [heading.removeprefix("## ") for heading in REQUIRED_SUMMARY_HEADINGS if _section_is_empty(stripped, heading)]
+    if empty:
+        return f"empty required sections: {', '.join(empty)}"
+    if _repeated_section_text(stripped):
+        return "summary repeats the same section content"
     return None
+
+
+def _section_is_empty(markdown: str, heading: str) -> bool:
+    start = markdown.find(heading) + len(heading)
+    remainder = markdown[start:]
+    next_heading = remainder.find("\n## ")
+    section = remainder if next_heading == -1 else remainder[:next_heading]
+    value = section.strip()
+    return not value or value in {"- None.", "None"}
+
+
+def _repeated_section_text(markdown: str) -> bool:
+    sections: list[str] = []
+    for heading in REQUIRED_SUMMARY_HEADINGS:
+        start = markdown.find(heading)
+        if start == -1:
+            continue
+        remainder = markdown[start + len(heading):]
+        next_heading = remainder.find("\n## ")
+        value = " ".join((remainder if next_heading == -1 else remainder[:next_heading]).split())
+        if len(value.split()) >= 12:
+            sections.append(value.lower())
+    for index, left in enumerate(sections):
+        for right in sections[index + 1:]:
+            shorter, longer = sorted((left, right), key=len)
+            if len(shorter) >= 40 and shorter in longer:
+                return True
+    return False
 
 
 def strip_outer_markdown_fence(content: str) -> str:
@@ -287,8 +327,21 @@ Description:
 {item.description or ""}
 
 Transcript:
-{transcript[:60000]}
+{_source_excerpt(transcript)}
 """
+
+
+def _source_excerpt(transcript: str, limit: int = 60000) -> str:
+    """Keep both the setup and the conclusion when a source exceeds the context budget."""
+    if len(transcript) <= limit:
+        return transcript
+    head = int(limit * 0.72)
+    tail = limit - head
+    return (
+        transcript[:head].rstrip()
+        + "\n\n[Middle of source omitted for context; do not infer missing details.]\n\n"
+        + transcript[-tail:].lstrip()
+    )
 
 
 def _prompt_path_for(item: MediaItem) -> Path:
@@ -333,4 +386,3 @@ Original link: {item.url}
 
 {excerpt or "No text content available."}
 """
-

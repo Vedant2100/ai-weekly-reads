@@ -1,4 +1,4 @@
-# Add one link per line.
+# Telegram research queue: one link per line.
 # Examples:
 # https://www.youtube.com/watch?v=...
 # https://example.com/podcast/feed.xml

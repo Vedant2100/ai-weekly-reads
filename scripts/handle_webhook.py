@@ -1,17 +1,19 @@
 import sys
 import json
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 
 # Paths
 ROOT = Path(__file__).resolve().parent.parent
 INBOX = ROOT / "inbox"
 LINKS_PATH = INBOX / "links.txt"
+CAPTURE_LOG_PATH = INBOX / "link_capture.jsonl"
 
 def extract_urls(text: str) -> list[str]:
     # Extract any URLs from the message text
     pattern = r'(https?://[^\s]+)'
-    return re.findall(pattern, text)
+    return [url.rstrip(".,!?;:)]}") for url in re.findall(pattern, text)]
 
 def extract_urls_from_message(message: dict) -> list[str]:
     urls = []
@@ -65,10 +67,6 @@ def main():
     # Extract links
     urls = extract_urls_from_message(message)
     
-    # Check for trigger commands
-    raw_text = (message.get("text") or "") + " " + (message.get("caption") or "")
-    trigger_send = "/send" in raw_text.lower() or "/ebook" in raw_text.lower()
-
     if urls:
         if not INBOX.exists():
             INBOX.mkdir(parents=True, exist_ok=True)
@@ -89,17 +87,22 @@ def main():
             with open(LINKS_PATH, "a", encoding="utf-8") as f:
                 for link in added_links:
                     f.write(f"{link}\n")
+            captured_at = datetime.now(timezone.utc).isoformat()
+            with open(CAPTURE_LOG_PATH, "a", encoding="utf-8") as f:
+                for link in added_links:
+                    f.write(json.dumps({
+                        "url": link,
+                        "captured_at": captured_at,
+                        "telegram_update_id": update.get("update_id"),
+                        "telegram_message_id": message.get("message_id"),
+                    }, ensure_ascii=False) + "\n")
             print(f"Added {len(added_links)} new links to links.txt.")
         else:
             print("No new unique links found.")
     else:
         print("No URLs found in the message.")
 
-    # Trigger batch process if command is detected
-    if trigger_send:
-        print("🚀 '/send' command detected! Triggering batch pipeline immediately...")
-        from process_inbox_batch import process_inbox_batch
-        process_inbox_batch(LINKS_PATH)
+    print("Queued for the next three-day research digest; Telegram no longer triggers immediate ebook generation.")
 
 if __name__ == "__main__":
     main()

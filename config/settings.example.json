@@ -39,5 +39,27 @@
     "browser_user_data_dir": "config/private/substack/browser",
     "compose_url": ""
   },
+  "email": {
+    "enabled": false,
+    "delivery_method": "gmail_api",
+    "recipient_email": "",
+    "sender_email": "",
+    "subject_prefix": "AI Research Reorientation",
+    "gmail_credentials_path": "config/private/google_credentials.json",
+    "gmail_token_path": "config/private/google_token.json",
+    "smtp_host": "smtp.gmail.com",
+    "smtp_port": 587,
+    "smtp_username": "",
+    "smtp_password_env": "EMAIL_SMTP_PASSWORD"
+  },
+  "google_sheets": {
+    "enabled": false,
+    "spreadsheet_id": "",
+    "worksheet_name": "Links",
+    "title": "AI Research Link Library",
+    "share_with_email": "",
+    "credentials_path": "config/private/google_credentials.json",
+    "token_path": "config/private/google_token.json"
+  },
   "feeds": []
 }

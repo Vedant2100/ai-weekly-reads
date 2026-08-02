@@ -37,7 +37,7 @@ def can_use_gemini() -> bool:
 
 
 def gemini_summary(item: MediaItem, transcript: str, settings: Settings) -> str:
-    from summarize import _local_summary, _summary_prompt, format_ai_summary
+    from summarize import _local_summary, _summary_prompt, format_ai_summary, summary_quality_issue
 
     try:
         client = _get_genai_client()
@@ -71,6 +71,11 @@ def gemini_summary(item: MediaItem, transcript: str, settings: Settings) -> str:
                         config={"temperature": 0.2},
                     )
                     if response and response.text:
+                        issue = summary_quality_issue(response.text)
+                        if issue:
+                            last_error = RuntimeError(f"Gemini response failed summary quality checks: {issue}")
+                            print(f"Gemini response from '{model}' was not usable: {issue}. Trying next model.")
+                            break
                         success = True
                         break
                 except Exception as exc:

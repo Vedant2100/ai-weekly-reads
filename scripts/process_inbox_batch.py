@@ -1,139 +1,25 @@
 from __future__ import annotations
 
 import argparse
-import os
-import sys
-from datetime import datetime
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-from config import load_settings
-from digest import build_digest
-from ebook import build_kindle_file, build_pdf_file
 from project_paths import INBOX
-from resources import write_resource
-from send_to_kindle import maybe_send_to_kindle
-from send_to_remarkable import maybe_send_to_remarkable
-from sources import MediaItem, read_inbox, resolve_link
-from summarize import _local_summary, get_or_create_summary, summary_path_for
-from transcript_store import find_raw_transcript, write_raw_transcript
-from transcripts import get_or_create_transcript
-from utils import write_text
+from research_digest import run_research_digest
 
 
 def process_inbox_batch(inbox_path: Path = INBOX / "links.txt") -> bool:
-    if not inbox_path.exists():
-        print(f"No inbox file found at {inbox_path}")
-        return False
-    links = read_inbox(inbox_path, [])
-    if not links:
-        print("No new links in inbox to process.")
-        return False
+    """Compatibility entry point for the old command.
 
-    settings = load_settings()
-    print(f"\n========================================================")
-    print(f"🚀 Starting Gemini Batch Pipeline for {len(links)} links...")
-    print(f"========================================================\n")
-
-    all_items: list[MediaItem] = []
-    for link in links:
-        print(f"🔗 Resolving link: {link}")
-        try:
-            resolved = resolve_link(link)
-            all_items.extend(resolved)
-        except Exception as exc:
-            print(f"Notice: Could not resolve link {link}: {exc}")
-
-    if not all_items:
-        print("❌ No valid media items resolved from links.")
-        return False
-
-    resource_paths: list[Path] = []
-    for item in all_items:
-        print(f"\n📑 Processing: {item.title} ({item.source_type})")
-        try:
-            transcript_path, method = get_or_create_transcript(item, settings)
-            if not transcript_path or not transcript_path.exists():
-                print(f"Notice: Full transcript unavailable for {item.title}; creating fallback entry.")
-                fallback_text = (
-                    f"Title: {item.title}\n"
-                    f"URL: {item.url}\n\n"
-                    "Full text/transcript could not be extracted.\n\n"
-                    f"{item.description or ''}"
-                )
-                transcript_path = write_raw_transcript(item, fallback_text, find_raw_transcript(item.id))
-                method = "unavailable"
-
-            summary_path = None
-            try:
-                summary_path = get_or_create_summary(item, transcript_path, settings)
-            except Exception as sum_exc:
-                print(f"Notice: AI summary generation failed for {item.title} ({sum_exc}). Using fallback summary.")
-
-            if not summary_path or not summary_path.exists():
-                summary_path = summary_path_for(item)
-                note = "We were unable to generate an AI summary for this link, but have kept the link and description in the ebook."
-                write_text(summary_path, _local_summary(item, "", settings, note=note))
-
-            res_path = write_resource(item, summary_path, transcript_path, method)
-            resource_paths.append(res_path)
-            print(f"✅ Included in ebook: {res_path.name}")
-        except Exception as exc:
-            print(f"❌ Failed processing {item.title}: {exc}")
-
-    if not resource_paths:
-        print("❌ No summaries generated.")
-        return False
-
-    print(f"\n📚 Compiling Topic-Categorized Master Ebook for {len(resource_paths)} items...")
-    digest_path = build_digest(
-        resource_paths,
-        settings,
-        output_prefix="gemini-inbox-batch",
-        write_public_latest=True,
-        write_weekly_book=True,
-    )
-    print(f"📄 Markdown Digest written: {digest_path}")
-
-    kindle_path = build_kindle_file(digest_path, settings)
-    print(f"📘 Categorized Ebook File written: {kindle_path}")
-
-    if (isinstance(settings.kindle, dict) and settings.kindle.get("enabled")) or os.environ.get("KINDLE_ENABLED") == "true":
-        print("📧 Sending to Kindle...")
-        try:
-            res = maybe_send_to_kindle(kindle_path, settings)
-            print(f"✅ Kindle delivery: {res}")
-        except Exception as exc:
-            print(f"Notice: Kindle delivery failed: {exc}")
-
-    if os.environ.get("REMARKABLE_DEVICE_TOKEN"):
-        print("📝 Generating PDF & Sending to reMarkable Cloud...")
-        try:
-            pdf_path = build_pdf_file(digest_path)
-            res = maybe_send_to_remarkable(pdf_path)
-            print(f"✅ reMarkable PDF delivery: {res}")
-        except Exception as exc:
-            print(f"Notice: reMarkable PDF delivery failed: {exc}")
-
-    # Archive processed links
-    archive_path = INBOX / "archive.txt"
-    stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    archive_entry = f"\n# Batch processed on {stamp}\n" + "\n".join(links) + "\n"
-    with open(archive_path, "a", encoding="utf-8") as f:
-        f.write(archive_entry)
-
-    # Empty inbox links file while keeping comment instructions
-    header = "# Add links here (one per line). Run python3 scripts/process_inbox_batch.py to process.\n"
-    inbox_path.write_text(header, encoding="utf-8")
-    print(f"\n🎉 Batch processing complete! Inbox archived to {archive_path.name} and cleared.")
-    return True
+    Link processing is now a research email digest. The old Kindle/ebook path
+    is intentionally no longer called from this command.
+    """
+    if inbox_path != INBOX / "links.txt":
+        raise ValueError("The research digest uses the canonical inbox/links.txt queue.")
+    return run_research_digest(force=True)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Process links in inbox via Gemini AI into a single categorized ebook.")
-    parser.add_argument("--inbox", type=Path, default=INBOX / "links.txt", help="Path to links text file")
+    parser = argparse.ArgumentParser(description="Send queued research links as an email digest.")
+    parser.add_argument("--inbox", type=Path, default=INBOX / "links.txt", help="Canonical research inbox path")
     args = parser.parse_args()
-    process_inbox_batch(args.inbox)
-    sys.exit(0)
-
+    raise SystemExit(0 if process_inbox_batch(args.inbox) else 1)
