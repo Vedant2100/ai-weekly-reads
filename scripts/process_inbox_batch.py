@@ -99,13 +99,13 @@ def process_inbox_batch(inbox_path: Path = INBOX / "links.txt") -> bool:
     kindle_path = build_kindle_file(digest_path, settings)
     print(f"📘 Categorized Ebook File written: {kindle_path}")
 
-    if isinstance(settings.kindle, dict) and settings.kindle.get("enabled"):
+    if (isinstance(settings.kindle, dict) and settings.kindle.get("enabled")) or os.environ.get("USER_EMAIL") or os.environ.get("KINDLE_SENDER_EMAIL") or os.environ.get("KINDLE_ENABLED") == "true":
         print("📧 Sending to Kindle / Gmail...")
         try:
-            res = maybe_send_to_kindle(kindle_path, settings)
+            res = maybe_send_to_kindle(kindle_path, settings, force=True)
             print(f"✅ Kindle / Gmail delivery: {res}")
         except Exception as exc:
-            print(f"Notice: Kindle delivery failed: {exc}")
+            print(f"Notice: Email delivery failed: {exc}")
 
     if os.environ.get("REMARKABLE_DEVICE_TOKEN"):
         print("📝 Sending to reMarkable Cloud...")

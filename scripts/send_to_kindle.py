@@ -21,18 +21,21 @@ GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send"
 
 def maybe_send_to_kindle(file_path: Path, settings: Settings, force: bool = False) -> str:
     kindle = settings.kindle
-    if not kindle.get("enabled"):
-        return "Kindle email delivery disabled."
+    user_email = os.environ.get("USER_EMAIL") or os.environ.get("GMAIL_RECIPIENT")
+    kindle_enabled = kindle.get("enabled") or os.environ.get("KINDLE_ENABLED") == "true" or user_email
 
-    recipient = _configured_email(kindle, "kindle_email")
-    if not recipient:
-        return "Kindle delivery skipped: kindle.kindle_email is not configured."
+    if not kindle_enabled:
+        return "Email delivery skipped: Email delivery disabled."
 
-    delivery_key, file_hash = _delivery_key(file_path, recipient)
+    recipient = _configured_email(kindle, "kindle_email") or os.environ.get("KINDLE_EMAIL", "").strip()
+    if not recipient and not user_email:
+        return "Email delivery skipped: No recipient (kindle_email or USER_EMAIL) configured."
+
+    delivery_key, file_hash = _delivery_key(file_path, recipient or user_email)
     if not force and _already_sent(delivery_key):
-        return f"Kindle delivery skipped: {file_path.name} was already sent to this Kindle address. Use --force to resend."
+        return f"Email delivery skipped: {file_path.name} was already sent. Use --force to resend."
 
-    delivery_method = str(kindle.get("delivery_method", "smtp")).strip().lower()
+    delivery_method = str(kindle.get("delivery_method") or os.environ.get("KINDLE_DELIVERY_METHOD", "smtp")).strip().lower()
     if delivery_method in {"apple_mail", "mail", "macos_mail"}:
         message = _send_with_apple_mail(file_path, kindle, recipient)
         _record_delivery_if_sent(message, delivery_key, file_hash, file_path, delivery_method, recipient)
@@ -43,41 +46,42 @@ def maybe_send_to_kindle(file_path: Path, settings: Settings, force: bool = Fals
         _record_delivery_if_sent(message, delivery_key, file_hash, file_path, delivery_method, recipient)
         return message
 
-    if delivery_method != "smtp":
-        return f"Kindle delivery skipped: unknown delivery_method={delivery_method!r}."
-
     message = _send_with_smtp(file_path, kindle, recipient)
-    _record_delivery_if_sent(message, delivery_key, file_hash, file_path, delivery_method, recipient)
+    _record_delivery_if_sent(message, delivery_key, file_hash, file_path, delivery_method, recipient or user_email)
     return message
 
 
 def _send_with_smtp(file_path: Path, kindle: dict, recipient: str) -> str:
-    sender = _configured_email(kindle, "sender_email")
+    sender = _configured_email(kindle, "sender_email") or os.environ.get("KINDLE_SENDER_EMAIL", "").strip()
     password_env = kindle.get("smtp_password_env", "KINDLE_SMTP_PASSWORD")
-    password = os.environ.get(password_env)
+    password = os.environ.get(password_env) or os.environ.get("KINDLE_SMTP_PASSWORD")
+    smtp_host = kindle.get("smtp_host") or os.environ.get("KINDLE_SMTP_HOST") or "smtp.gmail.com"
+    smtp_port = int(kindle.get("smtp_port") or os.environ.get("KINDLE_SMTP_PORT") or 587)
+    smtp_username = kindle.get("smtp_username") or os.environ.get("KINDLE_SMTP_USERNAME") or sender
+
     missing = []
     if not sender:
         missing.append("KINDLE_SENDER_EMAIL")
     if not password:
-        missing.append(password_env)
+        missing.append("KINDLE_SMTP_PASSWORD")
     if missing:
-        return f"Kindle delivery skipped: missing {', '.join(missing)}."
+        return f"Email delivery skipped: missing {', '.join(missing)}."
 
     recipients = [r.strip() for r in recipient.split(",") if r.strip()]
     user_email = os.environ.get("USER_EMAIL") or os.environ.get("GMAIL_RECIPIENT")
 
     sent_to = []
-    with smtplib.SMTP(kindle.get("smtp_host", "smtp.gmail.com"), int(kindle.get("smtp_port", 587))) as smtp:
+    with smtplib.SMTP(smtp_host, smtp_port) as smtp:
         smtp.starttls()
-        smtp.login(kindle.get("smtp_username") or sender, password)
+        smtp.login(smtp_username, password)
 
-        # Kindle email: Send EPUB file attachment
+        # Send Kindle attachment email (if Kindle recipient configured)
         for target in recipients:
             message = _build_message(file_path, sender, target, is_text_only=False)
             smtp.send_message(message)
             sent_to.append(f"{target} (Kindle attachment)")
 
-        # Gmail personal inbox: Send full article text directly in email body (no file attachments)
+        # Send personal Gmail inline article text email (if USER_EMAIL configured)
         if user_email and user_email.strip() not in recipients:
             target_user = user_email.strip()
             message = _build_message(file_path, sender, target_user, is_text_only=True)
