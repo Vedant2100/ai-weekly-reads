@@ -7,3 +7,4 @@ https://arxiv.org/abs/2606.01365
 https://arxiv.org/abs/2607.08010
 https://arxiv.org/abs/2606.05670
 https://arxiv.org/abs/2606.00765
+https://mem0.ai/blog/state-of-ai-agent-memory-2026
