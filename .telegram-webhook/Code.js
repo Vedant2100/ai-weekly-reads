@@ -1,50 +1,88 @@
 function doPost(e) {
-  var GITHUB_PAT = PropertiesService.getScriptProperties().getProperty("GITHUB_PAT");
-
   if (!e || !e.postData || !e.postData.contents) {
     return ContentService.createTextOutput("No data");
   }
 
   var contents = e.postData.contents;
-  var payloadJson = JSON.parse(contents);
+  var payloadJson;
+  try {
+    payloadJson = JSON.parse(contents);
+  } catch(err) {
+    return ContentService.createTextOutput("OK");
+  }
+
+  // Research digest has its own fast synchronous path
   if (payloadJson.action === "research_digest") {
     return handleResearchDigest(payloadJson);
   }
+
   var updateId = payloadJson.update_id;
 
+  // Idempotency: instantly reject duplicates before doing anything slow
   var cache = CacheService.getScriptCache();
   if (updateId && cache.get(updateId.toString())) {
     return ContentService.createTextOutput("OK");
   }
-
   if (updateId) {
-    cache.put(updateId.toString(), "processed", 300); // lock for 5 minutes
+    cache.put(updateId.toString(), "1", 300);
   }
 
-  var url = "https://api.github.com/repos/Vedant2100/ai-weekly-reads/dispatches";
+  // Store payload for async processing so we can return OK immediately.
+  // This is the key fix: Telegram gets a sub-second 200 response, eliminating
+  // the retry loop that happens when the GitHub API call takes too long.
+  var key = "pending_" + (updateId || Date.now().toString());
+  PropertiesService.getScriptProperties().setProperty(key, contents);
 
-  var payload = {
-    "event_type": "telegram_webhook",
-    "client_payload": payloadJson
-  };
-
-  var options = {
-    "method": "post",
-    "headers": {
-      "Authorization": "Bearer " + GITHUB_PAT,
-      "Accept": "application/vnd.github.v3+json"
-    },
-    "contentType": "application/json",
-    "payload": JSON.stringify(payload)
-  };
-
-  try {
-    UrlFetchApp.fetch(url, options);
-  } catch(error) {
-    console.error("Error calling GitHub:", error);
-  }
+  // Schedule background dispatch (fires in ~1 second, outside this request)
+  ScriptApp.newTrigger("dispatchPendingToGitHub")
+    .timeBased()
+    .after(1000)
+    .create();
 
   return ContentService.createTextOutput("OK");
+}
+
+// Background function: dispatches all stored payloads to GitHub and cleans up.
+function dispatchPendingToGitHub() {
+  // Clean up this trigger so they don't accumulate
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === "dispatchPendingToGitHub") {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+
+  var props = PropertiesService.getScriptProperties();
+  var GITHUB_PAT = props.getProperty("GITHUB_PAT");
+  var all = props.getProperties();
+  var url = "https://api.github.com/repos/Vedant2100/ai-weekly-reads/dispatches";
+
+  Object.keys(all).forEach(function(key) {
+    if (!key.startsWith("pending_")) return;
+
+    var contents = all[key];
+    props.deleteProperty(key); // delete before dispatch to avoid double-processing on error
+
+    var options = {
+      "method": "post",
+      "headers": {
+        "Authorization": "Bearer " + GITHUB_PAT,
+        "Accept": "application/vnd.github.v3+json"
+      },
+      "contentType": "application/json",
+      "payload": JSON.stringify({
+        "event_type": "telegram_webhook",
+        "client_payload": JSON.parse(contents)
+      }),
+      "muteHttpExceptions": true
+    };
+
+    try {
+      var resp = UrlFetchApp.fetch(url, options);
+      console.log("GitHub dispatch HTTP " + resp.getResponseCode() + " for key: " + key);
+    } catch(error) {
+      console.error("GitHub dispatch error for key " + key + ": " + error);
+    }
+  });
 }
 
 function handleResearchDigest(payload) {
