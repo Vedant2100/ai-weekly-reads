@@ -23,26 +23,70 @@ function doPost(e) {
   if (updateId && cache.get(updateId.toString())) {
     return ContentService.createTextOutput("OK");
   }
+
+  // Store payload FIRST so it's safe before we attempt dispatch
+  var props = PropertiesService.getScriptProperties();
+  var key = "pending_" + (updateId || Date.now().toString());
+  props.setProperty(key, contents);
+
+  // Mark as seen AFTER storing — prevents losing it if GitHub call is slow
   if (updateId) {
     cache.put(updateId.toString(), "1", 300);
   }
 
-  // Store payload for async processing so we can return OK immediately.
-  // This is the key fix: Telegram gets a sub-second 200 response, eliminating
-  // the retry loop that happens when the GitHub API call takes too long.
-  var key = "pending_" + (updateId || Date.now().toString());
-  PropertiesService.getScriptProperties().setProperty(key, contents);
+  // Attempt synchronous dispatch with a short deadline so Telegram
+  // always gets its 200 back well within the 5-second window.
+  var dispatched = dispatchToGitHub(payloadJson, props, key);
 
-  // Schedule background dispatch (fires in ~1 second, outside this request)
-  ScriptApp.newTrigger("dispatchPendingToGitHub")
-    .timeBased()
-    .after(1000)
-    .create();
+  if (!dispatched) {
+    // Dispatch failed/timed out — payload is already in Properties.
+    // Schedule a background retry so it's processed in ~1 min.
+    ScriptApp.newTrigger("dispatchPendingToGitHub")
+      .timeBased()
+      .after(60000)
+      .create();
+  }
 
   return ContentService.createTextOutput("OK");
 }
 
-// Background function: dispatches all stored payloads to GitHub and cleans up.
+// Attempts a single GitHub repository_dispatch. Returns true on HTTP 204.
+function dispatchToGitHub(payloadJson, props, key) {
+  var GITHUB_PAT = props.getProperty("GITHUB_PAT");
+  var options = {
+    "method": "post",
+    "headers": {
+      "Authorization": "Bearer " + GITHUB_PAT,
+      "Accept": "application/vnd.github.v3+json"
+    },
+    "contentType": "application/json",
+    "payload": JSON.stringify({
+      "event_type": "telegram_webhook",
+      "client_payload": payloadJson
+    }),
+    "muteHttpExceptions": true
+  };
+
+  try {
+    var resp = UrlFetchApp.fetch(
+      "https://api.github.com/repos/Vedant2100/ai-weekly-reads/dispatches",
+      options
+    );
+    var code = resp.getResponseCode();
+    console.log("GitHub dispatch HTTP " + code);
+    if (code === 204) {
+      props.deleteProperty(key); // clean up — successfully dispatched
+      return true;
+    }
+    console.error("GitHub dispatch non-204: " + resp.getContentText());
+    return false;
+  } catch(err) {
+    console.error("GitHub dispatch exception: " + err);
+    return false;
+  }
+}
+
+// Background retry: processes any payloads left in Properties by a failed dispatch.
 function dispatchPendingToGitHub() {
   // Clean up this trigger so they don't accumulate
   ScriptApp.getProjectTriggers().forEach(function(t) {
@@ -52,38 +96,18 @@ function dispatchPendingToGitHub() {
   });
 
   var props = PropertiesService.getScriptProperties();
-  var GITHUB_PAT = props.getProperty("GITHUB_PAT");
   var all = props.getProperties();
-  var url = "https://api.github.com/repos/Vedant2100/ai-weekly-reads/dispatches";
 
   Object.keys(all).forEach(function(key) {
     if (!key.startsWith("pending_")) return;
-
     var contents = all[key];
-    props.deleteProperty(key); // delete before dispatch to avoid double-processing on error
-
-    var options = {
-      "method": "post",
-      "headers": {
-        "Authorization": "Bearer " + GITHUB_PAT,
-        "Accept": "application/vnd.github.v3+json"
-      },
-      "contentType": "application/json",
-      "payload": JSON.stringify({
-        "event_type": "telegram_webhook",
-        "client_payload": JSON.parse(contents)
-      }),
-      "muteHttpExceptions": true
-    };
-
-    try {
-      var resp = UrlFetchApp.fetch(url, options);
-      console.log("GitHub dispatch HTTP " + resp.getResponseCode() + " for key: " + key);
-    } catch(error) {
-      console.error("GitHub dispatch error for key " + key + ": " + error);
-    }
+    var payloadJson;
+    try { payloadJson = JSON.parse(contents); } catch(e) { props.deleteProperty(key); return; }
+    props.deleteProperty(key);
+    dispatchToGitHub(payloadJson, props, key);
   });
 }
+
 
 function handleResearchDigest(payload) {
   var properties = PropertiesService.getScriptProperties();
