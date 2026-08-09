@@ -83,8 +83,14 @@ def run_research_digest(*, force: bool = False) -> bool:
                 "digest_date": now.date().isoformat(),
             })
 
-    email_body = _compose_email(items, now)
-    html_body = _compose_html_email(items, now)
+    meta_summary = ""
+    if _should_run_meta_summary(state, now):
+        meta_summary = _generate_meta_summary(items, state.get("recent_items", []), settings)
+        if meta_summary:
+            state["last_meta_summary_at"] = now.isoformat()
+
+    email_body = _compose_email(items, meta_summary, now)
+    html_body = _compose_html_email(items, meta_summary, now)
 
     prefix = str(settings.email.get("subject_prefix") or "AI Research Reorientation")
     subject = f"{prefix} — {now.date().isoformat()} ({len(items)} links)"
@@ -174,22 +180,35 @@ def _process_item(item: MediaItem, settings) -> dict[str, Any]:
     }
 
 
-def _generate_reorientation(items: list[dict[str, Any]], previous: list[dict[str, Any]], settings) -> str:
-    current_context = "\n\n".join(_item_context(item) for item in items)
-    recent_context = "\n".join(
+def _should_run_meta_summary(state: dict[str, Any], now: datetime) -> bool:
+    raw = state.get("last_meta_summary_at")
+    if not raw:
+        return True
+    try:
+        last = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        return (now - last).days >= 3
+    except ValueError:
+        return True
+
+
+def _generate_meta_summary(items: list[dict[str, Any]], previous: list[dict[str, Any]], settings) -> str:
+    context = "\n".join(
         f"- {entry.get('title', 'Untitled')}: {entry.get('takeaway', '')}"
-        for entry in previous[-40:]
-    ) or "No earlier digest context is available."
-    knowledge_base_context = _knowledge_base_context(items)
-    prior_context = f"Recent digest context:\n{recent_context}\n\nAccumulated Obsidian research context:\n{knowledge_base_context}"
-    prompt_template = read_text(ROOT / "prompts" / "research_reorientation.md")
-    prompt = f"""{prompt_template}
+        for entry in previous[-100:]
+    )
+    current_context = "\n".join(
+        f"- {item.get('item').title if 'item' in item else 'Untitled'}: {item.get('summary', '')[:500]}"
+        for item in items
+    )
+    prompt = f"""Generate a concise, intuition-driven meta-summary of the research topics explored over the past month.
+Synthesize the underlying themes, emerging trends, or interesting connections across these collected links. 
+Write a cohesive, engaging paragraph (or two) that conveys the core intuition clearly. Do not just list the links.
 
-Previous and accumulated research context:
-{prior_context[:36000]}
+Links from the past month:
+{context}
 
-Current source notes:
-{current_context[:60000]}
+New links added today:
+{current_context}
 """
 
     if settings.summary_provider == "gemini" and os.environ.get("GEMINI_API_KEY"):
@@ -211,7 +230,7 @@ Current source notes:
                             ],
                             config={"temperature": 0.15},
                         )
-                        if response and response.text and _reorientation_is_usable(response.text):
+                        if response and response.text and bool(response.text):
                             return response.text.strip()
                         break
                     except Exception as exc:
@@ -237,10 +256,10 @@ Current source notes:
                 json=payload,
                 timeout=180,
             )
-            response.raise_for_status()
-            text = response.json()["choices"][0]["message"]["content"]
-            if _reorientation_is_usable(text):
-                return text.strip()
+            if response.status_code == 200:
+                content = response.json()["choices"][0]["message"]["content"]
+                if content and bool(content):
+                    return content.strip()
         except Exception as exc:
             print(f"Research reorientation model unavailable: {exc}")
 
@@ -278,16 +297,17 @@ def _knowledge_base_context(items: list[dict[str, Any]], limit: int = 24000) -> 
     return "\n\n---\n\n".join(selected)
 
 
-def _compose_email(items: list[dict[str, Any]], now: datetime) -> str:
+def _compose_email(items: list[dict[str, Any]], meta_summary: str, now: datetime) -> str:
     lines = [
         "# AI Research Reorientation",
         "",
         f"Digest date: {now.date().isoformat()}",
         f"Links processed: {len(items)}",
-        "",
-        "## Link Notes",
-        "",
+        ""
     ]
+    if meta_summary:
+        lines.extend(["## 3-Day Rolling Meta Summary", "", meta_summary.strip(), ""])
+    lines.extend(["## Link Notes", ""])
     for index, record in enumerate(items, start=1):
         item: MediaItem = record["item"]
         lines.extend([
@@ -304,7 +324,7 @@ def _compose_email(items: list[dict[str, Any]], now: datetime) -> str:
     return "\n".join(lines).strip() + "\n"
 
 
-def _compose_html_email(items: list[dict[str, Any]], now: datetime) -> str:
+def _compose_html_email(items: list[dict[str, Any]], meta_summary: str, now: datetime) -> str:
     html_lines = [
         "<!DOCTYPE html>",
         "<html><head><meta charset='utf-8'><style>",
@@ -337,6 +357,14 @@ def _compose_html_email(items: list[dict[str, Any]], now: datetime) -> str:
         "</div>",
         "<div class='content'>",
     ]
+    if meta_summary:
+        from research_delivery import _markdown_to_html_snippet
+        html_lines.extend([
+            "<div class='reorientation' style='background: #f9fafb; border-left: 4px solid #3b82f6; padding: 20px; border-radius: 0 8px 8px 0; margin-bottom: 30px; font-size: 15px;'>",
+            "<h2>3-Day Rolling Meta Summary</h2>",
+            _markdown_to_html_snippet(meta_summary.strip()),
+            "</div>",
+        ])
 
     for record in items:
         item: MediaItem = record["item"]
