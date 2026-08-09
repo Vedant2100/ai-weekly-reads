@@ -117,3 +117,6 @@ https://arxiv.org/abs/2606.05670
 https://arxiv.org/abs/2606.00765
 https://mem0.ai/blog/state-of-ai-agent-memory-2026
 https://www.youtube.com/watch?v=k35LeKZEhiE
+
+# Research digest sent on 2026-08-09 16:00:57 UTC
+https://openreview.net/pdf?id=ITuuEaXcSB
