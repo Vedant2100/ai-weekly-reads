@@ -164,19 +164,37 @@ function appendResearchRows(rows, properties) {
     ]);
   }
 
+  var lastRow = sheet.getLastRow();
+  var existingUrls = {};
+  if (lastRow > 1) {
+    var urlValues = sheet.getRange(2, 5, lastRow - 1, 1).getValues();
+    for (var i = 0; i < urlValues.length; i++) {
+      if (urlValues[i][0]) {
+        existingUrls[String(urlValues[i][0])] = true;
+      }
+    }
+  }
+
   rows.forEach(function(row) {
+    var url = row.url || "";
+    if (url && existingUrls[url]) {
+      return; // Skip duplicate
+    }
     sheet.appendRow([
       row.captured_at || "",
       row.processed_at || "",
       row.type || "",
       row.title || "",
-      row.url || "",
+      url,
       row.source || "",
       row.published || "",
       row.transcript_method || "",
       row.summary_status || "",
       row.digest_date || ""
     ]);
+    if (url) {
+      existingUrls[url] = true;
+    }
   });
 }
 
