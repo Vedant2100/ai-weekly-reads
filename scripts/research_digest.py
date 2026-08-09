@@ -12,7 +12,9 @@ import requests
 
 from config import load_settings
 from project_paths import INBOX, RESOURCES, ROOT, ensure_dirs
+import html
 from research_delivery import (
+    _markdown_to_html,
     append_link_rows,
     classify_link,
     deliver_research_digest_via_apps_script,
@@ -87,13 +89,14 @@ def run_research_digest(*, force: bool = False) -> bool:
     previous = state.get("recent_items", [])
     reorientation = _generate_reorientation(items, previous, settings)
     email_body = _compose_email(items, reorientation, now)
+    html_body = _compose_html_email(items, reorientation, now)
 
     prefix = str(settings.email.get("subject_prefix") or "AI Research Reorientation")
     subject = f"{prefix} — {now.date().isoformat()} ({len(items)} links)"
     try:
         if _uses_apps_script(settings):
             rows_to_append = list(state.get("pending_sheet_rows", [])) + sheet_rows
-            email_status = deliver_research_digest_via_apps_script(subject, email_body, rows_to_append, settings)
+            email_status = deliver_research_digest_via_apps_script(subject, email_body, rows_to_append, settings, html_body=html_body)
             sheet_status = "Google Sheets rows appended by Apps Script."
             pending_sheet_rows: list[dict[str, Any]] = []
         else:
@@ -106,7 +109,7 @@ def run_research_digest(*, force: bool = False) -> bool:
                 print(f"Google Sheets update failed: {exc}")
                 print("Keeping the inbox queued; no email will be sent until the Sheet is updated.")
                 return False
-            email_status = send_research_email(subject, email_body, settings)
+            email_status = send_research_email(subject, email_body, settings, html_body=html_body)
     except Exception as exc:
         print(f"Research email failed: {exc}")
         return False
@@ -307,6 +310,78 @@ def _compose_email(items: list[dict[str, Any]], reorientation: str, now: datetim
             "",
         ])
     return "\n".join(lines).strip() + "\n"
+
+
+def _compose_html_email(items: list[dict[str, Any]], reorientation: str, now: datetime) -> str:
+    html_lines = [
+        "<!DOCTYPE html>",
+        "<html><head><meta charset='utf-8'><style>",
+        "body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f4f5; color: #1a1a1a; margin: 0; padding: 20px; line-height: 1.6; }",
+        ".container { max-width: 650px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); }",
+        ".header { background: #111827; color: #ffffff; padding: 30px; text-align: center; }",
+        ".header h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }",
+        ".header p { margin: 10px 0 0; color: #9ca3af; font-size: 14px; }",
+        ".content { padding: 30px; }",
+        ".reorientation { background: #f9fafb; border-left: 4px solid #3b82f6; padding: 20px; border-radius: 0 8px 8px 0; margin-bottom: 30px; font-size: 15px; }",
+        ".card { border: 1px solid #e5e7eb; border-radius: 10px; margin-bottom: 24px; overflow: hidden; background: #ffffff; }",
+        ".card-img { width: 100%; height: auto; display: block; border-bottom: 1px solid #e5e7eb; }",
+        ".card-body { padding: 20px; }",
+        ".badge { display: inline-block; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 12px; }",
+        ".badge.yt { background: #fee2e2; color: #dc2626; }",
+        ".badge.podcast { background: #f3e8ff; color: #7e22ce; }",
+        ".badge.pdf { background: #dbeafe; color: #2563eb; }",
+        ".badge.x { background: #e5e7eb; color: #374151; }",
+        ".badge.link { background: #d1fae5; color: #059669; }",
+        ".card-title { margin: 0 0 10px; font-size: 18px; line-height: 1.4; }",
+        ".card-title a { color: #111827; text-decoration: none; }",
+        ".card-title a:hover { text-decoration: underline; color: #3b82f6; }",
+        ".card-summary { color: #4b5563; font-size: 15px; }",
+        ".card-summary h2 { font-size: 16px; margin: 16px 0 8px; color: #111827; }",
+        ".footer { text-align: center; padding: 20px; color: #9ca3af; font-size: 13px; }",
+        "</style></head><body>",
+        "<div class='container'>",
+        "<div class='header'>",
+        "<h1>AI Weekly Reads</h1>",
+        f"<p>Digest Date: {now.date().isoformat()} &bull; {len(items)} Links Processed</p>",
+        "</div>",
+        "<div class='content'>",
+        "<div class='reorientation'>",
+        _markdown_to_html(reorientation.strip()),
+        "</div>",
+    ]
+
+    for record in items:
+        item: MediaItem = record["item"]
+        cat = classify_link(item.source_type, item.url)
+        badge_text = cat.upper()
+        if cat == "yt":
+            badge_text = "YOUTUBE"
+        elif cat == "x":
+            badge_text = "X POST"
+        
+        img = getattr(item, "image_url", None)
+        
+        html_lines.append("<div class='card'>")
+        if img:
+            html_lines.append(f"<img src='{html.escape(img)}' class='card-img' alt='Preview'>")
+        
+        html_lines.append("<div class='card-body'>")
+        html_lines.append(f"<span class='badge {cat}'>{badge_text}</span>")
+        html_lines.append(f"<h3 class='card-title'><a href='{html.escape(item.url)}'>{html.escape(item.title)}</a></h3>")
+        
+        summary_md = _email_summary(record["summary"])
+        html_lines.append(f"<div class='card-summary'>{_markdown_to_html(summary_md)}</div>")
+        
+        html_lines.append("</div></div>")
+        
+    html_lines.extend([
+        "</div>",
+        "<div class='footer'>Generated automatically by AI Weekly Reads pipeline.</div>",
+        "</div>",
+        "</body></html>"
+    ])
+    
+    return "\n".join(html_lines)
 
 
 def _email_summary(summary: str) -> str:

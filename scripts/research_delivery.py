@@ -25,6 +25,7 @@ def deliver_research_digest_via_apps_script(
     body: str,
     rows: list[dict[str, Any]],
     settings: Settings,
+    html_body: str | None = None,
 ) -> str:
     """Let the already-authorized Apps Script send mail and append Sheet rows."""
     email_settings = settings.email
@@ -43,7 +44,7 @@ def deliver_research_digest_via_apps_script(
             "secret": secret,
             "subject": subject,
             "body": body,
-            "html_body": _markdown_to_html(body),
+            "html_body": html_body or _markdown_to_html(body),
             "rows": rows,
         },
         timeout=180,
@@ -60,7 +61,7 @@ def deliver_research_digest_via_apps_script(
     return f"Sent research digest via Apps Script to {result.get('recipient', 'the configured Google account')}."
 
 
-def send_research_email(subject: str, body: str, settings: Settings) -> str:
+def send_research_email(subject: str, body: str, settings: Settings, html_body: str | None = None) -> str:
     email_settings = settings.email
     if not email_settings.get("enabled"):
         return "Research email delivery disabled."
@@ -72,13 +73,14 @@ def send_research_email(subject: str, body: str, settings: Settings) -> str:
     if not sender:
         return "Research email skipped: email.sender_email is not configured."
 
-    message = _build_email(subject, body, sender, recipient)
     method = str(email_settings.get("delivery_method") or "gmail_api").strip().lower()
     if method in {"gmail_api", "gmail", "google"}:
         service = _google_service(email_settings, [GMAIL_SEND_SCOPE])
+        message = _build_email(subject, body, sender, recipient, html_body=html_body)
         encoded = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
         service.users().messages().send(userId="me", body={"raw": encoded}).execute()
     elif method == "smtp":
+        message = _build_email(subject, body, sender, recipient, html_body=html_body)
         password_env = str(email_settings.get("smtp_password_env") or "EMAIL_SMTP_PASSWORD")
         password = os.environ.get(password_env) or os.environ.get("EMAIL_SMTP_PASSWORD")
         host = str(email_settings.get("smtp_host") or "smtp.gmail.com")
@@ -183,13 +185,13 @@ def classify_link(source_type: str, url: str) -> str:
     return "link"
 
 
-def _build_email(subject: str, body: str, sender: str, recipient: str) -> EmailMessage:
+def _build_email(subject: str, body: str, sender: str, recipient: str, html_body: str | None = None) -> EmailMessage:
     message = EmailMessage()
     message["Subject"] = subject
     message["From"] = sender
     message["To"] = recipient
     message.set_content(body)
-    message.add_alternative(_markdown_to_html(body), subtype="html")
+    message.add_alternative(html_body or _markdown_to_html(body), subtype="html")
     return message
 
 
