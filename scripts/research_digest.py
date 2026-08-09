@@ -15,6 +15,7 @@ from project_paths import INBOX, RESOURCES, ROOT, ensure_dirs
 import html
 from research_delivery import (
     _markdown_to_html,
+    _markdown_to_html_snippet,
     append_link_rows,
     classify_link,
     deliver_research_digest_via_apps_script,
@@ -346,7 +347,7 @@ def _compose_html_email(items: list[dict[str, Any]], reorientation: str, now: da
         "</div>",
         "<div class='content'>",
         "<div class='reorientation'>",
-        _markdown_to_html(reorientation.strip()),
+        _markdown_to_html_snippet(reorientation.strip()),
         "</div>",
     ]
 
@@ -370,7 +371,7 @@ def _compose_html_email(items: list[dict[str, Any]], reorientation: str, now: da
         html_lines.append(f"<h3 class='card-title'><a href='{html.escape(item.url)}'>{html.escape(item.title)}</a></h3>")
         
         summary_md = _email_summary(record["summary"])
-        html_lines.append(f"<div class='card-summary'>{_markdown_to_html(summary_md)}</div>")
+        html_lines.append(f"<div class='card-summary'>{_markdown_to_html_snippet(summary_md)}</div>")
         
         html_lines.append("</div></div>")
         
