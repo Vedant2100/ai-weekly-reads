@@ -5,8 +5,8 @@ name: Research Reorientation Digest
 on:
   workflow_dispatch:
   schedule:
-    # Check daily; the persisted runner state enforces a true one-day interval.
     - cron: "0 15 * * *"
+    - cron: "0 22 * * *"
 
 permissions:
   contents: write

@@ -53,10 +53,6 @@ def run_research_digest(*, force: bool = False) -> bool:
         return False
 
     now = datetime.now(timezone.utc)
-    if not force and not _is_due(state, now):
-        next_at = state.get("next_digest_at") or "the next three-day interval"
-        print(f"Research digest not due yet; next run is {next_at}.")
-        return False
 
     print(f"Building research reorientation for {len(links)} queued links.")
     records = _capture_records()
@@ -119,7 +115,6 @@ def run_research_digest(*, force: bool = False) -> bool:
     _archive_links(links, now)
     state.update({
         "last_digest_at": processed_at,
-        "next_digest_at": (now + timedelta(days=INTERVAL_DAYS)).isoformat(),
         "last_digest_subject": subject,
         "last_item_count": len(items),
         "last_sheet_status": sheet_status,
@@ -461,16 +456,6 @@ def _read_state() -> dict[str, Any]:
         return value if isinstance(value, dict) else {}
     except json.JSONDecodeError:
         return {}
-
-
-def _is_due(state: dict[str, Any], now: datetime) -> bool:
-    raw = state.get("next_digest_at")
-    if not raw:
-        return True
-    try:
-        return now >= datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
-    except ValueError:
-        return True
 
 
 def _capture_records() -> dict[str, dict[str, Any]]:
