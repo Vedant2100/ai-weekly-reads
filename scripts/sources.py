@@ -35,6 +35,7 @@ class MediaItem:
     source_name: str | None = None
     content_type: str | None = None
     audio_url: str | None = None
+    image_url: str | None = None
     published: str | None = None
     description: str | None = None
 
@@ -234,6 +235,7 @@ def _youtube_item(url: str) -> MediaItem:
     description = None
     published = None
     source_name = None
+    thumbnail = None
     try:
         import yt_dlp
 
@@ -258,12 +260,16 @@ def _youtube_item(url: str) -> MediaItem:
         ydl_opts.update(ytdlp_cookie_options())
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
-        title = info.get("title") or title
-        description = info.get("description")
-        source_name = info.get("channel") or info.get("uploader")
-        upload_date = info.get("upload_date")
-        if upload_date and len(upload_date) == 8:
-            published = f"{upload_date[:4]}-{upload_date[4:6]}-{upload_date[6:]}"
+            if not info:
+                raise ValueError("No video info extracted")
+
+            title = info.get("title", url)
+            source_name = info.get("uploader") or info.get("channel")
+            thumbnail = info.get("thumbnail")
+            description = info.get("description")
+            upload_date = info.get("upload_date")
+            if upload_date and len(upload_date) == 8:
+                published = f"{upload_date[:4]}-{upload_date[4:6]}-{upload_date[6:]}"
     except Exception as exc:
         err_msg = str(exc)
         if "bot" in err_msg.lower() or "cookies" in err_msg.lower():
@@ -338,6 +344,11 @@ def _parse_web_page(url: str) -> MediaItem:
         if soup.title and soup.title.string:
             title = soup.title.string.strip()
         description = _page_text(soup)
+        og_image = soup.find("meta", property="og:image")
+        if og_image and og_image.get("content"):
+            image_url = urljoin(url, og_image.get("content"))
+        else:
+            image_url = None
         audio = soup.find("audio")
         if audio:
             source = audio.find("source")
@@ -358,6 +369,7 @@ def _parse_web_page(url: str) -> MediaItem:
         origin=url,
         audio_url=audio_url,
         description=description,
+        image_url=image_url,
     )
 
 

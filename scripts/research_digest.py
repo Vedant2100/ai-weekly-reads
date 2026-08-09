@@ -300,6 +300,7 @@ def _compose_email(items: list[dict[str, Any]], reorientation: str, now: datetim
             "",
             f"Type: {classify_link(item.source_type, item.url)}",
             f"Source link: [{item.url}]({item.url})",
+            *([] if not getattr(item, "image_url", None) else [f"![Thumbnail]({item.image_url})"]),
             f"Summary status: {record['summary_status']}",
             "",
             _email_summary(record["summary"]),

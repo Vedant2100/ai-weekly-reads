@@ -196,6 +196,9 @@ def _build_email(subject: str, body: str, sender: str, recipient: str) -> EmailM
 def _markdown_to_html(markdown: str) -> str:
     lines: list[str] = []
     for raw_line in markdown.splitlines():
+        # Do not escape html yet since we need to match markdown image tags which might contain unescaped characters, 
+        # though the original code escaped it first. Wait, if we escape first, the `&` in URLs becomes `&amp;`.
+        # Let's keep the original flow but update the regex for images and avoid empty lines.
         line = html.escape(raw_line)
         if line.startswith("### "):
             lines.append(f"<h3>{line[4:]}</h3>")
@@ -206,8 +209,9 @@ def _markdown_to_html(markdown: str) -> str:
         elif line.startswith("- "):
             lines.append(f"<li>{line[2:]}</li>")
         elif not line.strip():
-            lines.append("<br>")
+            continue
         else:
+            line = re.sub(r"!\[([^]]*)\]\((https?://[^)]+)\)", r'<img src="\2" alt="\1" style="max-width:100%; height:auto;">', line)
             line = re.sub(r"\[([^]]+)\]\((https?://[^)]+)\)", r'<a href="\2">\1</a>', line)
             lines.append(f"<p>{line}</p>")
     return "<html><body style='font-family:Arial,sans-serif;line-height:1.5;max-width:900px'>" + "\n".join(lines) + "</body></html>"
