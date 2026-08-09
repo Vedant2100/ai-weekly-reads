@@ -34,7 +34,7 @@ from utils import load_dotenv, read_text, split_frontmatter, write_json, write_t
 STATE_PATH = INBOX / "research_state.json"
 CAPTURE_LOG_PATH = INBOX / "link_capture.jsonl"
 ARCHIVE_PATH = INBOX / "archive.txt"
-INTERVAL_DAYS = 3
+INTERVAL_DAYS = 1
 
 
 def run_research_digest(*, force: bool = False) -> bool:
