@@ -87,10 +87,8 @@ def run_research_digest(*, force: bool = False) -> bool:
                 "digest_date": now.date().isoformat(),
             })
 
-    previous = state.get("recent_items", [])
-    reorientation = _generate_reorientation(items, previous, settings)
-    email_body = _compose_email(items, reorientation, now)
-    html_body = _compose_html_email(items, reorientation, now)
+    email_body = _compose_email(items, now)
+    html_body = _compose_html_email(items, now)
 
     prefix = str(settings.email.get("subject_prefix") or "AI Research Reorientation")
     subject = f"{prefix} — {now.date().isoformat()} ({len(items)} links)"
@@ -285,14 +283,12 @@ def _knowledge_base_context(items: list[dict[str, Any]], limit: int = 24000) -> 
     return "\n\n---\n\n".join(selected)
 
 
-def _compose_email(items: list[dict[str, Any]], reorientation: str, now: datetime) -> str:
+def _compose_email(items: list[dict[str, Any]], now: datetime) -> str:
     lines = [
         "# AI Research Reorientation",
         "",
         f"Digest date: {now.date().isoformat()}",
         f"Links processed: {len(items)}",
-        "",
-        reorientation.strip(),
         "",
         "## Link Notes",
         "",
@@ -313,7 +309,7 @@ def _compose_email(items: list[dict[str, Any]], reorientation: str, now: datetim
     return "\n".join(lines).strip() + "\n"
 
 
-def _compose_html_email(items: list[dict[str, Any]], reorientation: str, now: datetime) -> str:
+def _compose_html_email(items: list[dict[str, Any]], now: datetime) -> str:
     html_lines = [
         "<!DOCTYPE html>",
         "<html><head><meta charset='utf-8'><style>",
@@ -323,7 +319,6 @@ def _compose_html_email(items: list[dict[str, Any]], reorientation: str, now: da
         ".header h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }",
         ".header p { margin: 10px 0 0; color: #9ca3af; font-size: 14px; }",
         ".content { padding: 30px; }",
-        ".reorientation { background: #f9fafb; border-left: 4px solid #3b82f6; padding: 20px; border-radius: 0 8px 8px 0; margin-bottom: 30px; font-size: 15px; }",
         ".card { border: 1px solid #e5e7eb; border-radius: 10px; margin-bottom: 24px; overflow: hidden; background: #ffffff; }",
         ".card-img { width: 100%; height: auto; display: block; border-bottom: 1px solid #e5e7eb; }",
         ".card-body { padding: 20px; }",
@@ -346,9 +341,6 @@ def _compose_html_email(items: list[dict[str, Any]], reorientation: str, now: da
         f"<p>Digest Date: {now.date().isoformat()} &bull; {len(items)} Links Processed</p>",
         "</div>",
         "<div class='content'>",
-        "<div class='reorientation'>",
-        _markdown_to_html_snippet(reorientation.strip()),
-        "</div>",
     ]
 
     for record in items:
