@@ -126,3 +126,6 @@ https://en.wikipedia.org/wiki/Meta-learning_(computer_science)
 
 # Research digest sent on 2026-08-09 22:35:46 UTC
 https://openreview.net/pdf?id=ITuuEaXcSB
+
+# Research digest sent on 2026-08-11 15:59:09 UTC
+https://www.alignmentforum.org/posts/GRmvZsHXH4vaijPMv/four-llm-loss-functions-four-flavors-of-llm-misalignment
