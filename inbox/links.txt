@@ -1,1 +1,2 @@
 # Telegram research links waiting for the next digest.
+https://www.alignmentforum.org/posts/GRmvZsHXH4vaijPMv/four-llm-loss-functions-four-flavors-of-llm-misalignment
