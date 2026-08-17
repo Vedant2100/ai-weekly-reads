@@ -135,3 +135,6 @@ https://www.alignmentforum.org/posts/GRmvZsHXH4vaijPMv/four-llm-loss-functions-f
 
 # Research digest sent on 2026-08-12 15:56:56 UTC
 https://www.alignmentforum.org/posts/GRmvZsHXH4vaijPMv/four-llm-loss-functions-four-flavors-of-llm-misalignment
+
+# Research digest sent on 2026-08-17 15:22:05 UTC
+https://x.com/i/status/2088729944725619107
